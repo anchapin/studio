@@ -6,6 +6,8 @@
 import { GameLobby, Player, HostGameConfig, LobbyStatus, PlayerStatus } from './multiplayer-types';
 import { generateGameCode, generateLobbyId, generatePlayerId } from './game-code-generator';
 import { publicLobbyBrowser } from './public-lobby-browser';
+import { validateDeckForLobby } from './format-validator';
+import type { SavedDeck } from '@/app/actions';
 
 /**
  * Client-side lobby manager for host game functionality
@@ -159,20 +161,42 @@ class LobbyManager {
   }
 
   /**
-   * Update player deck selection
+   * Update player deck selection with format validation
    */
-  updatePlayerDeck(playerId: string, deckId: string, deckName: string): boolean {
-    if (!this.currentLobby) return false;
-
-    const player = this.currentLobby.players.find(p => p.id === playerId);
-    if (player) {
-      player.deckId = deckId;
-      player.deckName = deckName;
-      this.saveLobbyToStorage();
-      return true;
+  updatePlayerDeck(
+    playerId: string,
+    deckId: string,
+    deckName: string,
+    deck?: SavedDeck
+  ): { success: boolean; isValid: boolean; errors: string[] } {
+    if (!this.currentLobby) {
+      return { success: false, isValid: false, errors: ['Lobby not found'] };
     }
 
-    return false;
+    const player = this.currentLobby.players.find(p => p.id === playerId);
+    if (!player) {
+      return { success: false, isValid: false, errors: ['Player not found'] };
+    }
+
+    // Update deck info
+    player.deckId = deckId;
+    player.deckName = deckName;
+    player.deckFormat = deck?.format;
+
+    // Validate deck against lobby format
+    if (deck) {
+      const validation = validateDeckForLobby(deck, this.currentLobby.format);
+      player.deckValidationErrors = [...validation.errors, ...validation.warnings];
+      this.saveLobbyToStorage();
+      return {
+        success: true,
+        isValid: validation.isValid && validation.canPlay,
+        errors: player.deckValidationErrors,
+      };
+    }
+
+    this.saveLobbyToStorage();
+    return { success: true, isValid: true, errors: [] };
   }
 
   /**
@@ -210,6 +234,7 @@ class LobbyManager {
 
   /**
    * Check if lobby can start
+   * Now includes format validation check
    */
   canStartGame(): boolean {
     if (!this.currentLobby) return false;
@@ -218,7 +243,17 @@ class LobbyManager {
     const hasEnoughPlayers = this.currentLobby.players.length >= 2;
     const allReady = this.allPlayersReady();
 
-    return hasEnoughPlayers && allReady;
+    // Check that all players have valid decks for the format
+    const allDecksValid = this.currentLobby.players.every(player => {
+      // Players must have a deck selected
+      if (!player.deckId) return false;
+
+      // Players must not have validation errors
+      const hasErrors = player.deckValidationErrors && player.deckValidationErrors.length > 0;
+      return !hasErrors;
+    });
+
+    return hasEnoughPlayers && allReady && allDecksValid;
   }
 
   /**
