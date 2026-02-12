@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview An AI deck coach for Magic: The Gathering.
@@ -9,7 +10,7 @@
 
 import { ai, googleAiPlugin } from '@/ai/genkit';
 import { z } from 'genkit';
-import { importDecklist } from '@/app/actions';
+import { validateCardLegality } from '@/app/actions';
 
 const DeckReviewInputSchema = z.object({
   decklist: z
@@ -118,13 +119,12 @@ const deckReviewFlow = ai.defineFlow(
             allValidationErrors.push(`For option "${option.title}", the 'cardsToAdd' or 'cardsToRemove' field was not a list.`);
             continue;
         }
+        
+        const cardIsValid = (c: any): c is { name: string; quantity: number } => 
+          c && typeof c === 'object' && typeof c.name === 'string' && c.name.trim() !== '' && typeof c.quantity === 'number' && c.quantity > 0;
 
-        const sanitizedCardsToAdd = cardsToAddRaw.filter(
-            (c: any): c is { name: string; quantity: number } => c && typeof c === 'object' && typeof c.name === 'string' && c.name.trim() !== '' && typeof c.quantity === 'number' && c.quantity > 0
-        );
-        const sanitizedCardsToRemove = cardsToRemoveRaw.filter(
-            (c: any): c is { name: string; quantity: number } => c && typeof c === 'object' && typeof c.name === 'string' && c.name.trim() !== '' && typeof c.quantity === 'number' && c.quantity > 0
-        );
+        const sanitizedCardsToAdd = cardsToAddRaw.filter(cardIsValid);
+        const sanitizedCardsToRemove = cardsToRemoveRaw.filter(cardIsValid);
 
         if (sanitizedCardsToAdd.length !== cardsToAddRaw.length || sanitizedCardsToRemove.length !== cardsToRemoveRaw.length) {
           allValidationErrors.push(`For option "${option.title}", one of your card lists contained malformed entries. Each card must be an object with a non-empty 'name' and a 'quantity' greater than 0.`);
@@ -145,8 +145,7 @@ const deckReviewFlow = ai.defineFlow(
         }
 
         if (sanitizedCardsToAdd.length > 0) {
-            const decklistForImport = sanitizedCardsToAdd.map(c => `${c.quantity} ${c.name}`).join('\n');
-            const importResult = await importDecklist(decklistForImport, input.format);
+            const importResult = await validateCardLegality(sanitizedCardsToAdd, input.format);
             
             const legalityErrors = [];
             if (importResult.notFound.length > 0) {
