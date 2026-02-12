@@ -14,7 +14,7 @@
  * - ResourceManager: Manages holding vs. using mana
  */
 
-import { GameState, PlayerState, evaluateGameState, ThreatAssessment } from './game-state-evaluator';
+import { GameState, PlayerState, evaluateGameState, ThreatAssessment, DetailedEvaluation } from './game-state-evaluator';
 
 /**
  * Represents a spell or ability on the stack
@@ -501,7 +501,7 @@ export class StackInteractionAI {
    */
   private assessActionThreat(
     context: StackContext,
-    currentEvaluation: any
+    currentEvaluation: DetailedEvaluation
   ): number {
     const action = context.currentAction;
     let threatLevel = 0;
@@ -582,7 +582,7 @@ export class StackInteractionAI {
   private evaluateResponseOption(
     response: AvailableResponse,
     context: StackContext,
-    currentEvaluation: any
+    currentEvaluation: DetailedEvaluation
   ): {
     expectedValue: number;
     reasoning: string;
@@ -652,7 +652,7 @@ export class StackInteractionAI {
   private shouldUseResponse(
     expectedValue: number,
     context: StackContext,
-    currentEvaluation: any
+    currentEvaluation: DetailedEvaluation
   ): boolean {
     // Base threshold
     let threshold = 0.3;
@@ -807,7 +807,7 @@ export class StackInteractionAI {
    */
   private evaluateHoldingMana(
     context: StackContext,
-    currentEvaluation: any
+    currentEvaluation: DetailedEvaluation
   ): {
     holdMana: boolean;
     waitForBetter: boolean;
@@ -856,7 +856,7 @@ export class StackInteractionAI {
    */
   private evaluatePassRisk(
     context: StackContext,
-    currentEvaluation: any
+    currentEvaluation: DetailedEvaluation
   ): 'low' | 'medium' | 'high' {
     let risk = 0;
 
@@ -892,7 +892,7 @@ export class StackInteractionAI {
   private shouldHoldPriority(
     response: AvailableResponse,
     context: StackContext,
-    currentEvaluation: any
+    currentEvaluation: DetailedEvaluation
   ): boolean {
     // Hold priority if we might want to add more to the stack
     const hasOtherResponses = context.availableResponses.length > 1;
@@ -929,7 +929,7 @@ export class StackInteractionAI {
   private protectsWinCondition(
     response: AvailableResponse,
     context: StackContext,
-    currentEvaluation: any
+    currentEvaluation: DetailedEvaluation
   ): boolean {
     // Check if the current action threatens our win condition
     const action = context.currentAction;
@@ -1022,7 +1022,7 @@ export class StackInteractionAI {
    */
   private calculateWinConditionDisruption(
     context: StackContext,
-    currentEvaluation: any
+    currentEvaluation: DetailedEvaluation
   ): number {
     const action = context.currentAction;
 
@@ -1142,7 +1142,7 @@ export class StackInteractionAI {
    */
   private shouldHoldForEndStep(
     context: StackContext,
-    currentEvaluation: any
+    currentEvaluation: DetailedEvaluation
   ): boolean {
     // Hold for end step if we have good instant-speed effects
     const goodInstants = context.availableResponses.filter(
@@ -1157,7 +1157,7 @@ export class StackInteractionAI {
    */
   private shouldHoldForOpponentTurn(
     context: StackContext,
-    currentEvaluation: any
+    currentEvaluation: DetailedEvaluation
   ): boolean {
     // Always hold some interaction for opponent's turn if we can
     const hasInteraction = context.availableResponses.some(
@@ -1172,11 +1172,11 @@ export class StackInteractionAI {
    */
   private shouldHoldForBetterThreat(
     context: StackContext,
-    currentEvaluation: any
+    currentEvaluation: DetailedEvaluation
   ): boolean {
     // If we're not under immediate pressure, hold for better targets
     const immediateThreats = currentEvaluation.threats.filter(
-      (t) => t.urgency === 'immediate'
+      (t: ThreatAssessment) => t.urgency === 'immediate'
     );
 
     return immediateThreats.length === 0 && context.availableResponses.length > 1;

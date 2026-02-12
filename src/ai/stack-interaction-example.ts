@@ -25,6 +25,26 @@ import {
 } from './game-state-evaluator';
 
 /**
+ * Helper function to convert StackAction to GameState stack item
+ */
+function toGameStateStackItem(action: StackAction): {
+  cardId: string;
+  controller: string;
+  type: 'spell' | 'ability';
+  targets?: string[];
+} {
+  return {
+    cardId: action.cardId,
+    controller: action.controller,
+    type: action.type,
+    targets: action.targets?.map(t => 
+      t.playerId || t.permanentId || t.cardId || ''
+    ).filter(Boolean),
+  };
+}
+
+
+/**
  * Helper function to create a basic game state for testing
  */
 function createBasicGameState(
@@ -151,7 +171,7 @@ export function example1BasicCounterspell(): void {
     timestamp: Date.now(),
   };
 
-  gameState.stack = [stackAction];
+  gameState.stack = [toGameStateStackItem(stackAction)];
 
   // We have a counterspell available
   const counterspell: AvailableResponse = {
@@ -219,7 +239,7 @@ export function example2DontCounterLowThreat(): void {
     timestamp: Date.now(),
   };
 
-  gameState.stack = [stackAction];
+  gameState.stack = [toGameStateStackItem(stackAction)];
 
   // We have the same counterspell
   const counterspell: AvailableResponse = {
@@ -286,7 +306,7 @@ export function example3HoldForEndStep(): void {
     timestamp: Date.now(),
   };
 
-  gameState.stack = [stackAction];
+  gameState.stack = [toGameStateStackItem(stackAction)];
   gameState.turnInfo.currentPlayer = 'player1';
   gameState.turnInfo.priority = 'player1';
 
@@ -356,7 +376,7 @@ export function example4HighThreatMustCounter(): void {
     timestamp: Date.now(),
   };
 
-  gameState.stack = [stackAction];
+  gameState.stack = [toGameStateStackItem(stackAction)];
   gameState.players['player1'].life = 5; // At 5 life, Bolt is lethal
 
   // We have a counterspell
@@ -440,7 +460,7 @@ export function example5ComplexStackOrdering(): void {
     },
   ];
 
-  gameState.stack = stackActions;
+  gameState.stack = stackActions.map(toGameStateStackItem);
   gameState.turnInfo.priority = 'player1';
 
   // We have multiple responses
@@ -522,7 +542,7 @@ export function example6HoldPriority(): void {
     timestamp: Date.now(),
   };
 
-  gameState.stack = [stackAction];
+  gameState.stack = [toGameStateStackItem(stackAction)];
   gameState.turnInfo.currentPlayer = 'player1';
   gameState.turnInfo.priority = 'player1';
 
@@ -589,7 +609,7 @@ export function example7EndOfTurnPlays(): void {
     timestamp: Date.now(),
   };
 
-  gameState.stack = [stackAction];
+  gameState.stack = [toGameStateStackItem(stackAction)];
   gameState.turnInfo.currentPlayer = 'player2';
   gameState.turnInfo.phase = 'end';
   gameState.turnInfo.step = 'end';
@@ -658,7 +678,7 @@ export function example8CardAdvantage(): void {
     timestamp: Date.now(),
   };
 
-  gameState.stack = [stackAction];
+  gameState.stack = [toGameStateStackItem(stackAction)];
 
   const counterspell: AvailableResponse = {
     cardId: 'counter_spell',

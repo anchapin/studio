@@ -10,9 +10,28 @@ import {
   StackAction,
   StackContext,
   AvailableResponse,
-  ResponseEffect,
 } from '../stack-interaction-ai';
 import { GameState, PlayerState } from '../game-state-evaluator';
+
+/**
+ * Helper function to convert StackAction to GameState stack item
+ */
+function toGameStateStackItem(action: StackAction): {
+  cardId: string;
+  controller: string;
+  type: 'spell' | 'ability';
+  targets?: string[];
+} {
+  return {
+    cardId: action.cardId,
+    controller: action.controller,
+    type: action.type,
+    targets: action.targets?.map(t => 
+      t.playerId || t.permanentId || t.cardId || ''
+    ).filter(Boolean),
+  };
+}
+
 
 /**
  * Create a test game state
@@ -136,7 +155,7 @@ function test1_HighThreat_ShouldCounter() {
     timestamp: Date.now(),
   };
 
-  gameState.stack = [stackAction];
+  gameState.stack = [toGameStateStackItem(stackAction)];
 
   const counterspell: AvailableResponse = {
     cardId: 'counter_spell',
@@ -202,7 +221,7 @@ function test2_LowThreat_ShouldNotCounter() {
     timestamp: Date.now(),
   };
 
-  gameState.stack = [stackAction];
+  gameState.stack = [toGameStateStackItem(stackAction)];
 
   const counterspell: AvailableResponse = {
     cardId: 'counter_spell',
@@ -268,7 +287,7 @@ function test3_LethalThreat_MustCounter() {
     timestamp: Date.now(),
   };
 
-  gameState.stack = [stackAction];
+  gameState.stack = [toGameStateStackItem(stackAction)];
   gameState.players['player1'].life = 5;
 
   const counterspell: AvailableResponse = {
@@ -336,7 +355,7 @@ function test4_ResourceManagement_HoldMana() {
     timestamp: Date.now(),
   };
 
-  gameState.stack = [stackAction];
+  gameState.stack = [toGameStateStackItem(stackAction)];
   gameState.turnInfo.currentPlayer = 'player1';
   gameState.turnInfo.priority = 'player1';
 
@@ -404,7 +423,7 @@ function test5_NoResponses_ShouldPass() {
     timestamp: Date.now(),
   };
 
-  gameState.stack = [stackAction];
+  gameState.stack = [toGameStateStackItem(stackAction)];
 
   const context: StackContext = {
     currentAction: stackAction,
@@ -455,7 +474,7 @@ function test6_PriorityDecision_LowRisk() {
     timestamp: Date.now(),
   };
 
-  gameState.stack = [stackAction];
+  gameState.stack = [toGameStateStackItem(stackAction)];
 
   const context: StackContext = {
     currentAction: stackAction,
@@ -513,7 +532,7 @@ export function runStackInteractionTests(): void {
   if (passed === total) {
     console.log('✓ All tests passed!\n');
   } else {
-    console.log(`✗ ${total - passed} test(s) failed\n');
+    console.log(`✗ ${total - passed} test(s) failed\n`);
     process.exit(1);
   }
 }
