@@ -9,6 +9,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { importDecklist } from '@/app/actions';
 
 const DeckReviewInputSchema = z.object({
   decklist: z
@@ -16,9 +17,12 @@ const DeckReviewInputSchema = z.object({
     .describe(
       'The full Magic: The Gathering decklist as a string, typically one card per line with quantity.'
     ),
-  format: z.string().describe('The Magic: The Gathering format for this deck (e.g., "Commander", "Standard", "Modern").')
+  format: z.string().describe('The Magic: The Gathering format for this deck (e.g., "Commander", "Standard", "Modern").'),
+  retryContext: z.string().optional().describe("Context from a previous failed attempt, explaining the error to the AI so it can correct it.")
 });
-export type DeckReviewInput = z.infer<typeof DeckReviewInputSchema>;
+// External input type does not include retryContext
+export type DeckReviewInput = z.infer<typeof DeckReviewInputSchema.omit<{ retryContext: true })>;
+
 
 const DeckReviewOutputSchema = z.object({
   reviewSummary: z.string().describe("A comprehensive analysis of the deck's strategy, strengths, weaknesses, and position in the current metagame."),
@@ -35,9 +39,6 @@ export async function reviewDeck(
   input: DeckReviewInput
 ): Promise<DeckReviewOutput> {
   const result = await deckReviewFlow(input);
-  if (!result.deckOptions) {
-    result.deckOptions = [];
-  }
   return result;
 }
 
@@ -52,6 +53,12 @@ const deckReviewPrompt = ai.definePrompt({
 **Decklist to review:**
 {{{decklist}}}
 
+{{#if retryContext}}
+**IMPORTANT - PLEASE CORRECT YOUR PREVIOUS MISTAKE:**
+You previously generated a response that had an error. Please pay close attention to the following feedback and generate a new, valid response.
+*Error Feedback:* {{{retryContext}}}
+{{/if}}
+
 **Your tasks:**
 1.  **Provide a \`reviewSummary\`**: Write a comprehensive analysis covering the deck's core strategy, its strengths and weaknesses, and how it fits into the current metagame for the specified format. Assume the provided decklist is legal for the format. Focus on strategic improvements, not rule violations.
 
@@ -61,21 +68,80 @@ const deckReviewPrompt = ai.definePrompt({
     *   Provide a \`cardsToAdd\` array with the exact card names and quantities to add.
     *   Provide a \`cardsToRemove\` array with the exact card names and quantities to remove from the original list.
     *   Ensure all card names are spelled correctly.
-    *   **CRITICAL RULE 1: All cards in \`cardsToAdd\` MUST be legal in the '{{{format}}}' format. This is non-negotiable. Double-check legality.**
+    *   **CRITICAL RULE 1: All cards in \`cardsToAdd\` MUST be legal in the '{{{format}}}' format. This is non-negotiable. Double-check legality. For example, 'Thalia, Guardian of Thraben' is NOT Standard legal.**
     *   **CRITICAL RULE 2: The total quantity of cards in \`cardsToAdd\` MUST EXACTLY equal the total quantity of cards in \`cardsToRemove\` to maintain the deck's total card count.** For example, if you remove 3 cards, you must add exactly 3 cards. This is essential for the deck to remain valid.`,
 });
 
 const deckReviewFlow = ai.defineFlow(
   {
     name: 'deckReviewFlow',
-    inputSchema: DeckReviewInputSchema,
+    inputSchema: DeckReviewInputSchema.omit({ retryContext: true }),
     outputSchema: DeckReviewOutputSchema,
   },
   async (input) => {
-    const { output } = await deckReviewPrompt(input);
-    if (!output) {
-      throw new Error("AI failed to generate a valid deck review.");
+    let attempts = 0;
+    const maxAttempts = 3;
+    let lastError = '';
+
+    while (attempts < maxAttempts) {
+      attempts++;
+      
+      const { output } = await deckReviewPrompt({
+        ...input,
+        retryContext: lastError || undefined,
+      });
+
+      if (!output || !output.deckOptions || output.deckOptions.length < 2) {
+        lastError = 'You did not provide at least two valid deck options. Please generate two complete options.';
+        continue; // Retry
+      }
+
+      let allOptionsValid = true;
+      for (const option of output.deckOptions) {
+        const cardsToAddFromAI = option.cardsToAdd || [];
+        const cardsToRemoveFromAI = option.cardsToRemove || [];
+
+        if (cardsToAddFromAI.length === 0 && cardsToRemoveFromAI.length === 0) {
+            allOptionsValid = false;
+            lastError = `For option "${option.title}", you provided no cards to add or remove. Please provide changes.`;
+            break;
+        }
+
+        const intendedAddCount = cardsToAddFromAI.reduce((sum, c) => sum + c.quantity, 0);
+        const intendedRemoveCount = cardsToRemoveFromAI.reduce((sum, c) => sum + c.quantity, 0);
+        if (intendedAddCount !== intendedRemoveCount) {
+          allOptionsValid = false;
+          lastError = `For option "${option.title}", you suggested adding ${intendedAddCount} cards but removing ${intendedRemoveCount}. The counts must be equal to maintain deck size.`;
+          break;
+        }
+
+        if (cardsToAddFromAI.length > 0) {
+            const decklistForImport = cardsToAddFromAI.map(c => `${c.quantity} ${c.name}`).join('\n');
+            const importResult = await importDecklist(decklistForImport, input.format);
+            
+            const errors = [];
+            if (importResult.notFound.length > 0) {
+                errors.push(`I could not find these cards: ${importResult.notFound.join(', ')}.`);
+            }
+            if (importResult.illegal.length > 0) {
+                errors.push(`These cards are not legal in the ${input.format} format: ${importResult.illegal.join(', ')}.`);
+            }
+
+            if (errors.length > 0) {
+                allOptionsValid = false;
+                lastError = `For option "${option.title}", your card suggestions have errors: ${errors.join(' ')} Please suggest only valid, legal cards for the ${input.format} format.`;
+                break;
+            }
+        }
+      }
+
+      if (allOptionsValid) {
+        return output; // Success!
+      }
+      // If not valid, the loop will continue with the new `lastError`.
     }
-    return output;
+
+    // If we exit the loop, it means we failed after maxAttempts.
+    throw new Error(`AI failed to generate valid deck suggestions after ${maxAttempts} attempts. Last error: ${lastError}`);
   }
 );
