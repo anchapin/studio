@@ -174,22 +174,41 @@ export function HandDisplay({
   // Sort cards based on current sort option
   const sortedCards = React.useMemo(() => {
     const sorted = [...cards];
+    
+    // Define sort functions outside switch to avoid lexical declarations in case blocks
+    const sortByName = (a: CardState, b: CardState) => a.card.name.localeCompare(b.card.name);
+    
+    const sortByManaCost = (a: CardState, b: CardState) => {
+      const cmcA = a.card.cmc ?? 0;
+      const cmcB = b.card.cmc ?? 0;
+      return cmcA - cmcB;
+    };
+    
+    const sortByType = (a: CardState, b: CardState) => {
+      const typeLineA = a.card.type_line ?? "";
+      const typeLineB = b.card.type_line ?? "";
+      return typeLineA.localeCompare(typeLineB);
+    };
+    
+    const sortByColor = (a: CardState, b: CardState) => {
+      const colorOrder = ["W", "U", "B", "R", "G"];
+      const colorsA = a.card.colors ?? [];
+      const colorsB = b.card.colors ?? [];
+      const colorIndexA = colorsA.length > 0 ? colorOrder.indexOf(colorsA[0]) : 999;
+      const colorIndexB = colorsB.length > 0 ? colorOrder.indexOf(colorsB[0]) : 999;
+      return colorIndexA - colorIndexB;
+    };
+    
     sorted.sort((a, b) => {
       switch (sortOption) {
         case "name":
-          return a.card.name.localeCompare(b.card.name);
+          return sortByName(a, b);
         case "manaCost":
-          const getCMC = (card: CardState) => card.card.cmc || 0;
-          return getCMC(a) - getCMC(b);
+          return sortByManaCost(a, b);
         case "type":
-          return a.card.type_line.localeCompare(b.card.type_line);
+          return sortByType(a, b);
         case "color":
-          const colorOrder = ["W", "U", "B", "R", "G"];
-          const getColorIndex = (card: CardState) => {
-            const colors = card.card.colors || [];
-            return colors.length > 0 ? colorOrder.indexOf(colors[0]) : 999;
-          };
-          return getColorIndex(a) - getColorIndex(b);
+          return sortByColor(a, b);
         default:
           return 0;
       }
