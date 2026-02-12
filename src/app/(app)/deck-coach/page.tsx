@@ -6,19 +6,24 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { getDeckReview, SavedDeck } from "@/app/actions";
+import { getDeckReview, SavedDeck, DeckCard, importDecklist } from "@/app/actions";
 import type { DeckReviewOutput } from "@/ai/flows/ai-deck-coach-review";
 import { Bot, Loader2 } from "lucide-react";
 import { ReviewDisplay } from "./_components/review-display";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { DeckSelector } from "@/components/deck-selector";
+import { useLocalStorage } from "@/hooks/use-local-storage";
+
+type DeckOption = DeckReviewOutput["deckOptions"][0];
 
 export default function DeckCoachPage() {
   const [decklist, setDecklist] = useState("");
   const [format, setFormat] = useState("commander");
   const [review, setReview] = useState<DeckReviewOutput | null>(null);
+  const [originalDeckCards, setOriginalDeckCards] = useState<DeckCard[] | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [savedDecks, setSavedDecks] = useLocalStorage<SavedDeck[]>('saved-decks', []);
   const { toast } = useToast();
 
   const handleReview = () => {
@@ -34,6 +39,31 @@ export default function DeckCoachPage() {
     startTransition(async () => {
       try {
         setReview(null);
+        
+        let initialCards: DeckCard[] = [];
+        if (originalDeckCards) {
+          initialCards = originalDeckCards;
+        } else {
+            const { found, notFound } = await importDecklist(decklist);
+            if (notFound.length > 0) {
+                 toast({
+                    variant: "destructive",
+                    title: "Some cards not found",
+                    description: `Could not process: ${notFound.join(", ")}. Please check spelling.`,
+                });
+            }
+            if (found.length === 0) {
+                toast({
+                    variant: "destructive",
+                    title: "No valid cards found",
+                    description: "Could not find any valid cards in the decklist provided.",
+                });
+                return;
+            }
+            initialCards = found;
+        }
+        setOriginalDeckCards(initialCards);
+
         const result = await getDeckReview({ decklist, format });
         setReview(result);
       } catch (error) {
@@ -51,8 +81,73 @@ export default function DeckCoachPage() {
     setFormat(deck.format);
     const decklistStr = deck.cards.map(c => `${c.count} ${c.name}`).join('\n');
     setDecklist(decklistStr);
+    setOriginalDeckCards(deck.cards);
     toast({ title: 'Deck Loaded', description: `Loaded "${deck.name}" for review.` });
-  }
+  };
+
+  const handleSaveNewDeck = async (option: DeckOption, newDeckName: string) => {
+    if (!originalDeckCards) return;
+
+    try {
+      // Deep copy to avoid mutation
+      let newDeckList: DeckCard[] = JSON.parse(JSON.stringify(originalDeckCards));
+
+      // Handle Removals
+      if (option.cardsToRemove) {
+        for (const toRemove of option.cardsToRemove) {
+          const cardIndex = newDeckList.findIndex(c => c.name.toLowerCase() === toRemove.name.toLowerCase());
+          if (cardIndex > -1) {
+            newDeckList[cardIndex].count -= toRemove.quantity;
+            if (newDeckList[cardIndex].count <= 0) {
+              newDeckList = newDeckList.filter((_, i) => i !== cardIndex);
+            }
+          } else {
+            console.warn(`Card to remove not found in deck: ${toRemove.name}`);
+          }
+        }
+      }
+
+      // Handle Additions
+      if (option.cardsToAdd && option.cardsToAdd.length > 0) {
+        const decklistForImport = option.cardsToAdd.map(c => `${c.quantity} ${c.name}`).join('\n');
+        const { found: cardsToAddFromApi, notFound } = await importDecklist(decklistForImport);
+
+        if (notFound.length > 0) {
+          toast({
+            variant: "destructive",
+            title: "AI Suggestion Error",
+            description: `The AI suggested cards that could not be found: ${notFound.join(", ")}`
+          });
+        }
+
+        for (const card of cardsToAddFromApi) {
+          const cardIndex = newDeckList.findIndex(c => c.id === card.id);
+          if (cardIndex > -1) {
+            newDeckList[cardIndex].count += card.count;
+          } else {
+            newDeckList.push(card);
+          }
+        }
+      }
+
+      const now = new Date().toISOString();
+      const newDeck: SavedDeck = {
+        id: crypto.randomUUID(),
+        name: newDeckName,
+        format,
+        cards: newDeckList,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      setSavedDecks(prevDecks => [...prevDecks, newDeck]);
+      toast({ title: "New Deck Saved!", description: `"${newDeckName}" has been added to your collection.` });
+    } catch (error) {
+      console.error("Failed to save new deck:", error);
+      toast({ variant: "destructive", title: "Save Failed", description: "An error occurred while saving the new deck." });
+    }
+  };
+
 
   return (
     <div className="flex-1 p-4 md:p-6">
@@ -103,7 +198,10 @@ export default function DeckCoachPage() {
               placeholder="1 Sol Ring&#10;1 Arcane Signet&#10;..."
               className="h-96 font-mono text-sm"
               value={decklist}
-              onChange={(e) => setDecklist(e.target.value)}
+              onChange={(e) => {
+                setDecklist(e.target.value);
+                setOriginalDeckCards(null); // Clear if user edits list manually
+              }}
               disabled={isPending}
             />
             <Button onClick={handleReview} disabled={isPending} className="mt-4 w-full">
@@ -126,7 +224,12 @@ export default function DeckCoachPage() {
                     </div>
                 </Card>
             )}
-            {!isPending && review && <ReviewDisplay review={review} />}
+            {!isPending && review && originalDeckCards && (
+              <ReviewDisplay 
+                review={review} 
+                onSaveNewDeck={handleSaveNewDeck} 
+              />
+            )}
             {!isPending && !review && (
                 <Card className="flex-1 flex items-center justify-center border-dashed">
                     <div className="text-center text-muted-foreground">

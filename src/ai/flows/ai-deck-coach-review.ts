@@ -24,7 +24,9 @@ const DeckReviewOutputSchema = z.object({
   reviewSummary: z.string().describe("A comprehensive analysis of the deck's strategy, strengths, weaknesses, and position in the current metagame."),
   deckOptions: z.array(z.object({
     title: z.string().describe("A short, descriptive title for this deck version (e.g., 'Anti-Aggro Package', 'Control Counter')."),
-    description: z.string().describe("A detailed explanation of this strategic option, including the core idea and a list of specific card changes (additions and removals) to achieve it.")
+    description: z.string().describe("A detailed explanation of this strategic option, including the core idea behind the changes."),
+    cardsToAdd: z.array(z.object({ name: z.string(), quantity: z.number() })).describe("A list of cards to add, with name and quantity."),
+    cardsToRemove: z.array(z.object({ name: z.string(), quantity: z.number() })).describe("A list of cards to remove, with name and quantity.")
   })).describe("At least two alternative versions of the deck, each with a specific strategic focus.").default([])
 });
 export type DeckReviewOutput = z.infer<typeof DeckReviewOutputSchema>;
@@ -47,11 +49,14 @@ const deckReviewPrompt = ai.definePrompt({
 {{{decklist}}}
 
 **Your tasks:**
-1.  **Provide a \`reviewSummary\`**: Write a comprehensive analysis covering the deck's core strategy, its strengths and weaknesses, and how it fits into the current metagame for the specified format.
+1.  **Provide a \`reviewSummary\`**: Write a comprehensive analysis covering the deck's core strategy, its strengths and weaknesses, and how it fits into the current metagame for the specified format. Assume the provided decklist is legal for the format. Focus on strategic improvements, not rule violations.
 
 2.  **Propose \`deckOptions\`**: Create at least two distinct options for improving the deck. Each option should have a clear strategic focus (e.g., making it better against aggro, or giving it more tools against control). For each option:
     *   Provide a short, descriptive \`title\`.
-    *   Provide a detailed \`description\` that explains the strategy and lists the specific cards to add and remove. For example: "This option focuses on beating control decks. To do this, we'll add 2x Demolition Field to handle problematic lands and 2x Cavern of Souls to make our creatures uncounterable. We'll remove 4x...".`,
+    *   Provide a detailed \`description\` that explains the strategy behind the changes. DO NOT list the card changes in the description itself.
+    *   Provide a \`cardsToAdd\` array with the exact card names and quantities to add.
+    *   Provide a \`cardsToRemove\` array with the exact card names and quantities to remove from the original list.
+    *   Ensure the card names are spelled correctly. The number of cards added should generally equal the number of cards removed to maintain deck size.`,
 });
 
 const deckReviewFlow = ai.defineFlow(
