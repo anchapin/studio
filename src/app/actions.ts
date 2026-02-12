@@ -7,11 +7,8 @@ import { generateAIOpponentDeck, AIOpponentDeckGenerationInput } from "@/ai/flow
 export interface ScryfallCard {
   id: string;
   oracle_id?: string;
-  name: string;
-  cmc?: number;
-  power?: string;
-  toughness?: string;
   keywords?: string[];
+  name: string;
   image_uris?: {
     small: string;
     normal: string;
