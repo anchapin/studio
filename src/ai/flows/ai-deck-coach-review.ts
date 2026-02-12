@@ -47,6 +47,7 @@ const deckReviewPrompt = ai.definePrompt({
   name: 'deckReviewPrompt',
   input: { schema: DeckReviewInputSchema },
   output: { schema: DeckReviewOutputSchema },
+  model: 'googleai/gemini-1.5-pro',
   prompt: `You are an expert Magic: The Gathering deck builder and coach. Your task is to provide a strategic analysis of the provided decklist and then propose at least two distinct, improved versions.
 
 **Format:** {{{format}}}
@@ -94,8 +95,8 @@ const deckReviewFlow = ai.defineFlow(
         retryContext: lastError || undefined,
       });
 
-      if (!output) {
-        lastError = 'You did not return a valid response. Please adhere to the output schema.';
+      if (!output || !output.deckOptions) {
+        lastError = 'You did not return a valid response. Please adhere to the output schema and provide at least two deckOptions.';
         continue;
       }
       
