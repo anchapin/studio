@@ -46,9 +46,10 @@ export default function MultiplayerPage() {
                     <CardTitle>Join with Code</CardTitle>
                     <CardDescription>Have an invite code? Join a private game directly.</CardDescription>
                 </CardHeader>
-                <CardContent className="flex gap-2">
-                    <Input placeholder="Enter game code..." />
-                    <Button>Join</Button>
+                <CardContent>
+                    <Link href="/multiplayer/join">
+                        <Button className="w-full">Join Game</Button>
+                    </Link>
                 </CardContent>
             </Card>
         </div>

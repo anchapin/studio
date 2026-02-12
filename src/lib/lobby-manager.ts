@@ -4,10 +4,7 @@
  */
 
 import { GameLobby, Player, HostGameConfig, LobbyStatus, PlayerStatus } from './multiplayer-types';
-import { generateGameCode, generateLobbyId, generatePlayerId } from './game-code-generator';
-import { publicLobbyBrowser } from './public-lobby-browser';
-import { validateDeckForLobby } from './format-validator';
-import type { SavedDeck } from '@/app/actions';
+import { generateGameCode, generateLobbyId, generatePlayerId, normalizeGameCode } from './game-code-generator';
 
 /**
  * Client-side lobby manager for host game functionality
@@ -16,6 +13,8 @@ import type { SavedDeck } from '@/app/actions';
 class LobbyManager {
   private currentLobby: GameLobby | null = null;
   private hostPlayerId: string | null = null;
+  private currentPlayerId: string | null = null;
+  private isHosting: boolean = false;
 
   /**
    * Create a new game lobby
@@ -47,34 +46,17 @@ class LobbyManager {
 
     this.currentLobby = lobby;
     this.hostPlayerId = hostPlayerId;
+    this.currentPlayerId = hostPlayerId;
+    this.isHosting = true;
 
     // Store in localStorage for persistence
     this.saveLobbyToStorage();
-
-    // Register public game if applicable
-    if (config.settings.isPublic) {
-      const hostPlayer = lobby.players.find(p => p.id === hostPlayerId);
-      publicLobbyBrowser.registerPublicGame({
-        id: lobby.id,
-        gameCode: lobby.gameCode,
-        name: lobby.name,
-        hostName: hostPlayer?.name || 'Host',
-        format: lobby.format,
-        maxPlayers: lobby.maxPlayers,
-        currentPlayers: lobby.players.length,
-        status: lobby.status === 'in-progress' ? 'in-progress' : 'waiting',
-        isPublic: config.settings.isPublic,
-        hasPassword: !!config.settings.password,
-        allowSpectators: config.settings.allowSpectators,
-        createdAt: lobby.createdAt,
-      });
-    }
 
     return lobby;
   }
 
   /**
-   * Get the current lobby (if hosting)
+   * Get the current lobby (if hosting or joined)
    */
   getCurrentLobby(): GameLobby | null {
     if (!this.currentLobby) {
@@ -82,6 +64,20 @@ class LobbyManager {
       this.loadLobbyFromStorage();
     }
     return this.currentLobby;
+  }
+
+  /**
+   * Check if current user is hosting
+   */
+  getIsHosting(): boolean {
+    return this.isHosting;
+  }
+
+  /**
+   * Get the current player ID
+   */
+  getCurrentPlayerId(): string | null {
+    return this.currentPlayerId;
   }
 
   /**
@@ -106,13 +102,6 @@ class LobbyManager {
     this.currentLobby.players.push(newPlayer);
     this.saveLobbyToStorage();
 
-    // Update public game if applicable
-    if (this.currentLobby.settings.isPublic) {
-      publicLobbyBrowser.updatePublicGame(this.currentLobby.id, {
-        currentPlayers: this.currentLobby.players.length,
-      });
-    }
-
     return newPlayer;
   }
 
@@ -130,14 +119,6 @@ class LobbyManager {
 
     if (this.currentLobby.players.length < initialLength) {
       this.saveLobbyToStorage();
-
-      // Update public game if applicable
-      if (this.currentLobby.settings.isPublic) {
-        publicLobbyBrowser.updatePublicGame(this.currentLobby.id, {
-          currentPlayers: this.currentLobby.players.length,
-        });
-      }
-
       return true;
     }
 
@@ -161,42 +142,20 @@ class LobbyManager {
   }
 
   /**
-   * Update player deck selection with format validation
+   * Update player deck selection
    */
-  updatePlayerDeck(
-    playerId: string,
-    deckId: string,
-    deckName: string,
-    deck?: SavedDeck
-  ): { success: boolean; isValid: boolean; errors: string[] } {
-    if (!this.currentLobby) {
-      return { success: false, isValid: false, errors: ['Lobby not found'] };
-    }
+  updatePlayerDeck(playerId: string, deckId: string, deckName: string): boolean {
+    if (!this.currentLobby) return false;
 
     const player = this.currentLobby.players.find(p => p.id === playerId);
-    if (!player) {
-      return { success: false, isValid: false, errors: ['Player not found'] };
-    }
-
-    // Update deck info
-    player.deckId = deckId;
-    player.deckName = deckName;
-    player.deckFormat = deck?.format;
-
-    // Validate deck against lobby format
-    if (deck) {
-      const validation = validateDeckForLobby(deck, this.currentLobby.format);
-      player.deckValidationErrors = [...validation.errors, ...validation.warnings];
+    if (player) {
+      player.deckId = deckId;
+      player.deckName = deckName;
       this.saveLobbyToStorage();
-      return {
-        success: true,
-        isValid: validation.isValid && validation.canPlay,
-        errors: player.deckValidationErrors,
-      };
+      return true;
     }
 
-    this.saveLobbyToStorage();
-    return { success: true, isValid: true, errors: [] };
+    return false;
   }
 
   /**
@@ -207,14 +166,6 @@ class LobbyManager {
 
     this.currentLobby.status = status;
     this.saveLobbyToStorage();
-
-    // Update public game if applicable
-    if (this.currentLobby.settings.isPublic) {
-      publicLobbyBrowser.updatePublicGame(this.currentLobby.id, {
-        status: status === 'in-progress' ? 'in-progress' : 'waiting',
-      });
-    }
-
     return true;
   }
 
@@ -234,7 +185,6 @@ class LobbyManager {
 
   /**
    * Check if lobby can start
-   * Now includes format validation check
    */
   canStartGame(): boolean {
     if (!this.currentLobby) return false;
@@ -243,35 +193,126 @@ class LobbyManager {
     const hasEnoughPlayers = this.currentLobby.players.length >= 2;
     const allReady = this.allPlayersReady();
 
-    // Check that all players have valid decks for the format
-    const allDecksValid = this.currentLobby.players.every(player => {
-      // Players must have a deck selected
-      if (!player.deckId) return false;
-
-      // Players must not have validation errors
-      const hasErrors = player.deckValidationErrors && player.deckValidationErrors.length > 0;
-      return !hasErrors;
-    });
-
-    return hasEnoughPlayers && allReady && allDecksValid;
+    return hasEnoughPlayers && allReady;
   }
 
   /**
-   * Close and destroy the current lobby
+   * Join an existing lobby by game code
+   * In production, this would connect to a signaling server to find the lobby
+   * For now, it looks for lobbies stored in localStorage (for testing)
    */
-  closeLobby(): void {
-    // Unregister from public browser if applicable
-    if (this.currentLobby?.settings.isPublic) {
-      publicLobbyBrowser.unregisterPublicGame(this.currentLobby.id);
+  joinLobby(gameCode: string, playerName: string): { success: boolean; lobby?: GameLobby; error?: string } {
+    // Normalize the game code
+    const normalizedCode = normalizeGameCode(gameCode);
+
+    // In production, this would make an API call to find the lobby
+    // For now, we'll simulate by looking for the lobby in a simulated lobby registry
+    const lobby = this.findLobbyByCode(normalizedCode);
+
+    if (!lobby) {
+      return {
+        success: false,
+        error: 'Invalid game code. Please check the code and try again.',
+      };
     }
 
-    this.currentLobby = null;
-    this.hostPlayerId = null;
-    localStorage.removeItem('planar_nexus_current_lobby');
+    // Check if lobby is full
+    const maxPlayers = parseInt(lobby.maxPlayers);
+    if (lobby.players.length >= maxPlayers) {
+      return {
+        success: false,
+        error: 'This lobby is full.',
+      };
+    }
+
+    // Check if lobby is already in progress
+    if (lobby.status === 'in-progress') {
+      return {
+        success: false,
+        error: 'This game has already started.',
+      };
+    }
+
+    // Create a new player
+    const newPlayer: Player = {
+      id: generatePlayerId(),
+      name: playerName,
+      status: 'not-ready',
+      joinedAt: Date.now(),
+    };
+
+    // Add player to the lobby
+    lobby.players.push(newPlayer);
+
+    // Set as current lobby (we're joining, not hosting)
+    this.currentLobby = lobby;
+    this.currentPlayerId = newPlayer.id;
+    this.isHosting = false;
+
+    // Store in localStorage with a different key to distinguish from hosted lobbies
+    this.saveJoinedLobbyToStorage(lobby, newPlayer.id);
+
+    return {
+      success: true,
+      lobby,
+    };
   }
 
   /**
-   * Save lobby to localStorage for persistence
+   * Leave a joined lobby
+   */
+  leaveLobby(): void {
+    if (!this.currentLobby || !this.currentPlayerId || this.isHosting) {
+      return;
+    }
+
+    // Remove the current player from the lobby
+    const playerId = this.currentPlayerId;
+    this.removePlayer(playerId);
+
+    // Clear local state
+    this.currentLobby = null;
+    this.currentPlayerId = null;
+    localStorage.removeItem('planar_nexus_joined_lobby');
+  }
+
+  /**
+   * Find a lobby by game code (simulated for prototype)
+   * In production, this would query a server
+   */
+  private findLobbyByCode(gameCode: string): GameLobby | null {
+    // For prototype testing, look for hosted lobbies in localStorage
+    const hostedLobby = localStorage.getItem('planar_nexus_current_lobby');
+    if (hostedLobby) {
+      try {
+        const lobby: GameLobby = JSON.parse(hostedLobby);
+        if (normalizeGameCode(lobby.gameCode) === normalizeGameCode(gameCode)) {
+          return lobby;
+        }
+      } catch (e) {
+        console.error('Failed to parse hosted lobby:', e);
+      }
+    }
+
+    // In production, this would make an API call to a lobby registry
+    // For now, return null to indicate no lobby found
+    return null;
+  }
+
+  /**
+   * Close and destroy the current lobby (host only)
+   */
+  closeLobby(): void {
+    this.currentLobby = null;
+    this.hostPlayerId = null;
+    this.currentPlayerId = null;
+    this.isHosting = false;
+    localStorage.removeItem('planar_nexus_current_lobby');
+    localStorage.removeItem('planar_nexus_joined_lobby');
+  }
+
+  /**
+   * Save lobby to localStorage for persistence (host)
    */
   private saveLobbyToStorage(): void {
     if (this.currentLobby) {
@@ -280,16 +321,45 @@ class LobbyManager {
   }
 
   /**
+   * Save joined lobby to localStorage (for non-host players)
+   */
+  private saveJoinedLobbyToStorage(lobby: GameLobby, playerId: string): void {
+    const joinedData = {
+      lobby,
+      playerId,
+    };
+    localStorage.setItem('planar_nexus_joined_lobby', JSON.stringify(joinedData));
+  }
+
+  /**
    * Load lobby from localStorage
    */
   private loadLobbyFromStorage(): void {
-    const stored = localStorage.getItem('planar_nexus_current_lobby');
-    if (stored) {
+    // First try to load as host
+    const hostedLobby = localStorage.getItem('planar_nexus_current_lobby');
+    if (hostedLobby) {
       try {
-        this.currentLobby = JSON.parse(stored);
+        this.currentLobby = JSON.parse(hostedLobby);
+        this.isHosting = true;
+        this.currentPlayerId = this.currentLobby?.hostId || null;
+        return;
       } catch (e) {
-        console.error('Failed to load lobby from storage:', e);
+        console.error('Failed to load hosted lobby from storage:', e);
         localStorage.removeItem('planar_nexus_current_lobby');
+      }
+    }
+
+    // Then try to load as joined player
+    const joinedLobby = localStorage.getItem('planar_nexus_joined_lobby');
+    if (joinedLobby) {
+      try {
+        const joinedData = JSON.parse(joinedLobby);
+        this.currentLobby = joinedData.lobby;
+        this.currentPlayerId = joinedData.playerId;
+        this.isHosting = false;
+      } catch (e) {
+        console.error('Failed to load joined lobby from storage:', e);
+        localStorage.removeItem('planar_nexus_joined_lobby');
       }
     }
   }

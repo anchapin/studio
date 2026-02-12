@@ -8,7 +8,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { GameLobby, Player, HostGameConfig, LobbyStatus, PlayerStatus } from '@/lib/multiplayer-types';
 import { lobbyManager } from '@/lib/lobby-manager';
 import { formatGameCode } from '@/lib/game-code-generator';
-import { validateDeckForLobby } from '@/lib/format-validator';
 
 export interface UseLobbyReturn {
   lobby: GameLobby | null;
@@ -16,15 +15,18 @@ export interface UseLobbyReturn {
   isLoading: boolean;
   error: string | null;
   createLobby: (config: HostGameConfig, hostName: string) => void;
+  joinLobby: (gameCode: string, playerName: string) => void;
+  leaveLobby: () => void;
   addPlayer: (playerName: string) => Player | null;
   removePlayer: (playerId: string) => boolean;
   updatePlayerStatus: (playerId: string, status: PlayerStatus) => boolean;
-  updatePlayerDeck: (playerId: string, deckId: string, deckName: string, deck?: any) => { success: boolean; isValid: boolean; errors: string[] };
+  updatePlayerDeck: (playerId: string, deckId: string, deckName: string) => boolean;
   canStartGame: boolean;
   startGame: () => boolean;
   closeLobby: () => void;
   getGameCode: () => string;
   validateDeckForFormat: (deck: any) => { isValid: boolean; errors: string[] };
+  getCurrentPlayerId: () => string | null;
 }
 
 export function useLobby(): UseLobbyReturn {
@@ -38,7 +40,7 @@ export function useLobby(): UseLobbyReturn {
     const existingLobby = lobbyManager.getCurrentLobby();
     if (existingLobby) {
       setLobby(existingLobby);
-      setIsHost(true); // If we have a stored lobby, we're the host
+      setIsHost(lobbyManager.getIsHosting());
     }
   }, []);
 
@@ -55,6 +57,22 @@ export function useLobby(): UseLobbyReturn {
     } finally {
       setIsLoading(false);
     }
+  }, []);
+
+  const joinLobby = useCallback((gameCode: string, playerName: string) => {
+    setIsLoading(true);
+    setError(null);
+
+    const result = lobbyManager.joinLobby(gameCode, playerName);
+
+    if (result.success && result.lobby) {
+      setLobby(result.lobby);
+      setIsHost(false);
+    } else {
+      setError(result.error || 'Failed to join lobby');
+    }
+
+    setIsLoading(false);
   }, []);
 
   const addPlayer = useCallback((playerName: string) => {
@@ -81,12 +99,12 @@ export function useLobby(): UseLobbyReturn {
     return success;
   }, []);
 
-  const updatePlayerDeck = useCallback((playerId: string, deckId: string, deckName: string, deck?: any) => {
-    const result = lobbyManager.updatePlayerDeck(playerId, deckId, deckName, deck);
-    if (result.success) {
+  const updatePlayerDeck = useCallback((playerId: string, deckId: string, deckName: string) => {
+    const success = lobbyManager.updatePlayerDeck(playerId, deckId, deckName);
+    if (success) {
       setLobby(lobbyManager.getCurrentLobby());
     }
-    return result;
+    return success;
   }, []);
 
   const canStartGame = lobby ? lobbyManager.canStartGame() : false;
@@ -109,12 +127,18 @@ export function useLobby(): UseLobbyReturn {
     setIsHost(false);
   }, []);
 
+  const leaveLobby = useCallback(() => {
+    lobbyManager.leaveLobby();
+    setLobby(null);
+    setIsHost(false);
+  }, []);
+
   const getGameCode = useCallback(() => {
     return lobby ? formatGameCode(lobby.gameCode) : '';
   }, [lobby]);
 
   const validateDeckForFormat = useCallback((deck: any) => {
-    if (!lobby) return { isValid: false, errors: ['No lobby found'] };
+    if (!lobby) return { isValid: false, errors: ["'No lobby found'"] };
 
     const validation = validateDeckForLobby(deck, lobby.format);
     return {
@@ -123,12 +147,19 @@ export function useLobby(): UseLobbyReturn {
     };
   }, [lobby]);
 
+
+  const getCurrentPlayerId = useCallback(() => {
+    return lobbyManager.getCurrentPlayerId();
+  }, []);
+
   return {
     lobby,
     isHost,
     isLoading,
     error,
     createLobby,
+    joinLobby,
+    leaveLobby,
     addPlayer,
     removePlayer,
     updatePlayerStatus,
@@ -138,5 +169,6 @@ export function useLobby(): UseLobbyReturn {
     closeLobby,
     getGameCode,
     validateDeckForFormat,
+    getCurrentPlayerId,
   };
 }
