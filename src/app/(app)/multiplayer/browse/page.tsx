@@ -326,12 +326,16 @@ export default function BrowseGamesPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex gap-1">
+                        <div className="flex gap-1 items-center">
                           {game.hasPassword && (
-                            <Lock className="w-4 h-4 text-muted-foreground" title="Password protected" />
+                            <span title="Password protected">
+                              <Lock className="w-4 h-4 text-muted-foreground" />
+                            </span>
                           )}
                           {game.allowSpectators && (
-                            <Eye className="w-4 h-4 text-muted-foreground" title="Spectators allowed" />
+                            <span title="Spectators allowed">
+                              <Eye className="w-4 h-4 text-muted-foreground" />
+                            </span>
                           )}
                           {!game.hasPassword && !game.allowSpectators && (
                             <span className="text-xs text-muted-foreground">Open</span>
