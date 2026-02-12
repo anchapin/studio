@@ -153,7 +153,7 @@ export async function importDecklist(
     if (collection?.data && Array.isArray(collection.data)) {
         for (const card of collection.data) {
             // SUPER defensive check to prevent crashes from malformed API responses.
-            if (!card || typeof card.name !== 'string') continue;
+            if (!card || !card.name || typeof card.name !== 'string') continue;
             
             const lowerCaseName = card.name.toLowerCase();
             const count = counts.get(lowerCaseName);
@@ -175,7 +175,7 @@ export async function importDecklist(
     if (collection?.not_found && Array.isArray(collection.not_found)) {
         for (const item of collection.not_found) {
             // SUPER defensive check. The item should be an identifier object, e.g., { name: '...' }
-            if (!item || typeof item.name !== 'string') continue;
+            if (!item || !item.name || typeof item.name !== 'string') continue;
             notFound.push(item.name);
         }
     }
