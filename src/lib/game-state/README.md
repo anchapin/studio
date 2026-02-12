@@ -10,6 +10,7 @@ The game state module implements a complete, type-safe representation of a Magic
 - **Zones**: All game zones (library, hand, battlefield, graveyard, exile, stack, command)
 - **Players**: Complete player state including life, mana, counters
 - **Turn Phases**: Full turn structure with all phases and steps
+- **Multiplayer Turn Tracking**: Round tracking, turn order, neighbor detection for multiplayer
 - **Combat**: Attackers, blockers, damage assignment
 - **Stack**: Spell and ability resolution
 - **Priority**: Tracking priority passes
@@ -148,6 +149,37 @@ import { passPriority } from '@/lib/game-state';
 state = passPriority(state, playerId);
 ```
 
+### Multiplayer Turn Tracking
+
+```typescript
+import {
+  createTurnOrder,
+  getNextPlayerInTurnOrder,
+  getAttackableOpponents,
+  getRoundInfo,
+  getPlayerSeats
+} from '@/lib/game-state';
+
+// Create turn order for 4-player Commander
+const turnOrder = createTurnOrder(playerIds, 'clockwise');
+
+// Get next player in turn order
+const nextPlayer = getNextPlayerInTurnOrder(state.turn);
+
+// Get attackable opponents (for free-for-all)
+const opponents = getAttackableOpponents(state.turn, allPlayerIds);
+
+// Get round information
+const roundInfo = getRoundInfo(state.turn);
+console.log(`Round ${roundInfo.roundNumber}, Player ${roundInfo.currentPlayerInRound}/${roundInfo.turnsInRound}`);
+
+// Get player seating arrangement
+const seats = getPlayerSeats(state.turn);
+seats.forEach(seat => {
+  console.log(`${seat.playerId}: left=${seat.leftNeighborId}, right=${seat.rightNeighborId}`);
+});
+```
+
 ## Game Flow
 
 ### 1. Setup
@@ -222,6 +254,20 @@ Zones are identified by `{playerId}-{zoneType}`:
 All timestamp-based effects use Unix epoch milliseconds:
 - `enteredBattlefieldTimestamp` - For "last in, first out" effects
 - `attachedTimestamp` - For attachment ordering
+
+### Multiplayer Turn Order
+
+Turn order is tracked as an array of player IDs in clockwise order:
+- `turn.turnOrder` - Array of player IDs in turn order
+- `turn.activePlayerIndex` - Index of current player in turn order
+- `turn.roundNumber` - Current round (increments each full cycle)
+- `turn.turnOrderType` - Method used to determine order ("clockwise", "random", "custom")
+
+This supports:
+- **2-player games**: Traditional head-to-head
+- **3-4 player Commander**: Free-for-all with neighbor relationships
+- **Random starting player**: Fair play determination
+- **Custom turn order**: Specified starting player
 
 ## Future Enhancements
 

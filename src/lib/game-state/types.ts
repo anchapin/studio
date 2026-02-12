@@ -225,6 +225,28 @@ export enum Phase {
 }
 
 /**
+ * Turn order determination method
+ */
+export type TurnOrderType =
+  | "clockwise" /** Standard clockwise turn order */
+  | "random" /** Random starting player, then clockwise */
+  | "custom" /** Custom turn order specified by players */;
+
+/**
+ * Player position in turn order
+ */
+export interface PlayerSeat {
+  /** Player ID */
+  playerId: PlayerId;
+  /** Seat position (0-based, clockwise) */
+  seatPosition: number;
+  /** Player ID to their left (next in clockwise order) */
+  leftNeighborId: PlayerId | null;
+  /** Player ID to their right (previous in clockwise order) */
+  rightNeighborId: PlayerId | null;
+}
+
+/**
  * Turn structure
  */
 export interface Turn {
@@ -232,7 +254,7 @@ export interface Turn {
   activePlayerId: PlayerId;
   /** Current phase */
   currentPhase: Phase;
-  /** Turn number (starts at 1) */
+  /** Turn number (starts at 1, increments each full cycle) */
   turnNumber: number;
   /** Number of extra turns this player has after this one */
   extraTurns: number;
@@ -240,6 +262,14 @@ export interface Turn {
   isFirstTurn: boolean;
   /** Timestamp when turn started */
   startedAt: number;
+  /** Round number (for Commander formats, 1 round = N turns where N = player count) */
+  roundNumber: number;
+  /** Turn order for all players (in clockwise order) */
+  turnOrder: PlayerId[];
+  /** Index of active player in turn order */
+  activePlayerIndex: number;
+  /** Type of turn order being used */
+  turnOrderType: TurnOrderType;
 }
 
 /**

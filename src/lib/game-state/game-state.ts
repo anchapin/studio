@@ -20,7 +20,7 @@ import {
   hasLethalDamage,
 } from "./card-instance";
 import { createPlayerZones, createSharedZones, createZone } from "./zones";
-import { createTurn, advancePhase, startNextTurn } from "./turn-phases";
+import { createTurn, advancePhase, startNextTurn, initializeTurnOrder } from "./turn-phases";
 
 /**
  * Generate a unique player ID
@@ -90,7 +90,8 @@ function createPlayer(
 export function createInitialGameState(
   playerNames: string[],
   startingLife: number = 20,
-  isCommander: boolean = false
+  isCommander: boolean = false,
+  turnOrderType: "clockwise" | "random" = "clockwise"
 ): GameState {
   const gameId = generateGameId();
   const players = new Map<PlayerId, Player>();
@@ -117,7 +118,9 @@ export function createInitialGameState(
     zones.set(zoneId, zone);
   });
 
-  const firstPlayerId = playerIds[0];
+  // Initialize turn order
+  const turnOrder = initializeTurnOrder(playerIds, turnOrderType);
+  const firstPlayerId = turnOrder[0];
 
   return {
     gameId,
@@ -125,7 +128,7 @@ export function createInitialGameState(
     cards,
     zones,
     stack: [],
-    turn: createTurn(firstPlayerId, 1, true),
+    turn: createTurn(firstPlayerId, 1, true, turnOrder, turnOrderType),
     combat: {
       inCombatPhase: false,
       attackers: [],
@@ -320,13 +323,10 @@ function advanceToNextPhase(state: GameState): GameState {
 
   // Check if turn is ending
   if (nextPhase.currentPhase === state.turn.currentPhase) {
-    // Need to advance to next player's turn
-    const currentPlayerIndex = Array.from(state.players.keys()).indexOf(
-      state.turn.activePlayerId
-    );
+    // Need to advance to next player's turn using turn order
     const nextPlayerIndex =
-      (currentPlayerIndex + 1) % state.players.size;
-    const nextPlayerId = Array.from(state.players.keys())[nextPlayerIndex];
+      (state.turn.activePlayerIndex + 1) % state.turn.turnOrder.length;
+    const nextPlayerId = state.turn.turnOrder[nextPlayerIndex];
 
     const newTurn = startNextTurn(state.turn, nextPlayerId, false);
 
