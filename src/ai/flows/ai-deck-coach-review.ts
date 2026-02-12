@@ -7,7 +7,7 @@
  * - DeckReviewOutput - The return type for the reviewDeck function.
  */
 
-import { ai } from '@/ai/genkit';
+import { ai, googleAiPlugin } from '@/ai/genkit';
 import { z } from 'genkit';
 import { importDecklist } from '@/app/actions';
 
@@ -45,7 +45,7 @@ export async function reviewDeck(
 
 const deckReviewPrompt = ai.definePrompt({
   name: 'deckReviewPrompt',
-  model: 'models/gemini-1.5-flash-latest',
+  model: googleAiPlugin.model('gemini-1.5-flash-latest'),
   input: { schema: DeckReviewInputSchema },
   output: { schema: DeckReviewOutputSchema },
   prompt: `You are an expert Magic: The Gathering deck builder and coach. Your response will be validated for correctness by an automated tool. If your response fails validation, you will be asked to try again with specific feedback on your errors.
