@@ -83,16 +83,17 @@ Your task is to analyze the provided decklist for the specified format, identify
 
 Format: {{{format}}}
 
-Consider the following aspects based on the format:
--   **Mana Curve and Base:** Is the mana curve appropriate for the deck's strategy? Is there enough mana generation (ramp)?
--   **Win Conditions:** Are there clear ways for the deck to win? How resilient are they?
--   **Card Quality & Synergies:** Do the cards work well together? Are there powerful interactions or combo potential?
--   **Weaknesses & Vulnerabilities:** What are the deck's choke points? Is it vulnerable to certain types of interaction? Does it lack essential elements like removal, card draw, or protection?
--   **Format Legality & Staples:** Are the cards legal in the specified format? Does the deck include format staples or is it missing key ones?
--   **Sideboard (if applicable):** For formats with sideboards, evaluate its effectiveness against the expected meta.
--   **Card Count & Rules:** Ensure the deck adheres to the minimum card count and card quantity rules for the format.
+**Important: Assume the provided decklist is legal for the specified format and adheres to all card count and quantity rules.** Your role is not to be a rules lawyer, but a strategic coach.
 
-Provide your analysis in a structured JSON format according to the output schema. Be concise and precise in your suggestions.
+Consider the following strategic aspects based on the format:
+-   **Mana Curve and Base:** Is the mana curve appropriate for the deck's strategy? Is there enough mana generation (ramp) and is the mana base consistent?
+-   **Win Conditions:** Are there clear ways for the deck to win? How resilient are they against common disruption in the format?
+-   **Card Quality & Synergies:** Do the cards work well together? Are there powerful interactions or combo potential? Are there any underperforming cards?
+-   **Weaknesses & Vulnerabilities:** What are the deck's choke points? Is it vulnerable to certain types of strategies (aggro, control, combo)? Does it lack essential elements like removal, card draw, or protection?
+-   **Format Staples & Meta:** How does this deck position itself against the current metagame for the format? Does it include format staples, or is it missing key ones that would improve its matchups?
+-   **Sideboard (if applicable):** For formats with sideboards, evaluate its effectiveness against the expected meta. Are the sideboard cards high-impact in the right matchups?
+
+Provide your analysis in a structured JSON format according to the output schema. Be concise and precise in your suggestions. For each suggestion, provide a clear action (add, remove, replace) and a compelling reason.
 
 Decklist to review:
 {{{decklist}}}`,
