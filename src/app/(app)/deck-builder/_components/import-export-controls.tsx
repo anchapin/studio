@@ -12,7 +12,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Download, Upload, Trash2 } from "lucide-react";
+import { Download, Upload, Trash2, Loader2 } from "lucide-react";
 import { useState } from "react";
 import {
   AlertDialog,
@@ -30,19 +30,19 @@ interface ImportExportControlsProps {
   onImport: (decklist: string) => void;
   onExport: () => void;
   onClear: () => void;
+  isImporting?: boolean;
 }
 
-export function ImportExportControls({ onImport, onExport, onClear }: ImportExportControlsProps) {
+export function ImportExportControls({ onImport, onExport, onClear, isImporting = false }: ImportExportControlsProps) {
   const [importText, setImportText] = useState("");
 
   const handleImportClick = () => {
     onImport(importText);
-    setImportText("");
   };
 
   return (
     <div className="flex items-center gap-2">
-      <Dialog>
+      <Dialog onOpenChange={(open) => !open && setImportText("")}>
         <DialogTrigger asChild>
           <Button variant="outline" size="sm">
             <Upload className="mr-2" />
@@ -61,10 +61,14 @@ export function ImportExportControls({ onImport, onExport, onClear }: ImportExpo
             className="h-64"
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
+            disabled={isImporting}
           />
           <DialogFooter>
             <DialogClose asChild>
-              <Button type="button" onClick={handleImportClick}>Import</Button>
+              <Button type="button" onClick={handleImportClick} disabled={isImporting}>
+                {isImporting && <Loader2 className="mr-2 animate-spin" />}
+                {isImporting ? 'Importing...' : 'Import'}
+              </Button>
             </DialogClose>
           </DialogFooter>
         </DialogContent>

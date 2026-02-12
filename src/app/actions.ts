@@ -21,6 +21,11 @@ export interface ScryfallCard {
   color_identity: string[];
 }
 
+export type DeckCard = ScryfallCard & {
+  count: number;
+};
+
+
 export async function searchScryfall(query: string): Promise<ScryfallCard[]> {
   if (!query || query.length < 3) {
     return [];
@@ -67,4 +72,73 @@ export async function generateOpponent(input: AIOpponentDeckGenerationInput) {
         console.error("Error generating AI opponent:", error);
         throw new Error("Failed to generate AI opponent.");
     }
+}
+
+export async function importDecklist(
+  decklist: string
+): Promise<{ found: DeckCard[]; notFound: string[] }> {
+  const lines = decklist.split('\n').filter((line) => line.trim() !== '');
+  if (lines.length === 0) {
+    return { found: [], notFound: [] };
+  }
+
+  const cardRequests: { name: string; count: number }[] = lines.map((line) => {
+    // Regex to capture count (optional) and card name, ignoring set codes and collector numbers
+    const match = line.trim().match(/^(?:(\d+)\s*x?\s*)?([^()]+)/);
+    if (match) {
+      const count = parseInt(match[1] || '1', 10);
+      const name = match[2].trim();
+      return { name, count };
+    }
+    // Fallback for lines that don't match, e.g., just card name
+    return { name: line.trim(), count: 1 };
+  });
+
+  const uniqueNames = [...new Set(cardRequests.map(c => c.name))].filter(Boolean);
+  const identifiers = uniqueNames.map(name => ({name}));
+
+  if (identifiers.length === 0) {
+    return { found: [], notFound: [] };
+  }
+  
+  try {
+    const res = await fetch(`https://api.scryfall.com/cards/collection`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ identifiers }),
+      // To avoid rate limits on Scryfall
+      next: { revalidate: 3600 }
+    });
+
+    if (!res.ok) {
+      console.error(`Scryfall API error: ${res.status} ${res.statusText}`);
+      const errorData = await res.json();
+      console.error("Scryfall error details:", errorData);
+      const notFound = errorData?.details?.not_found?.map((item:any) => item.name) || uniqueNames;
+      return { found: [], notFound };
+    }
+
+    const result = await res.json();
+    const notFoundNames: string[] = result.not_found.map((item: any) => item.name);
+    
+    const nameToCountMap = new Map<string, number>();
+    for (const req of cardRequests) {
+      if (req.name) {
+        nameToCountMap.set(req.name, (nameToCountMap.get(req.name) || 0) + req.count);
+      }
+    }
+
+    const foundCards: DeckCard[] = result.data.map((card: ScryfallCard) => ({
+      ...card,
+      count: nameToCountMap.get(card.name) || 1,
+    }));
+    
+    return { found: foundCards, notFound: notFoundNames };
+
+  } catch (error) {
+    console.error('Failed to fetch from Scryfall API', error);
+    return { found: [], notFound: uniqueNames };
+  }
 }

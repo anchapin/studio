@@ -1,17 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { ScryfallCard } from "@/app/actions";
+import { ScryfallCard, DeckCard, importDecklist } from "@/app/actions";
 import { CardSearch } from "./_components/card-search";
 import { DeckList } from "./_components/deck-list";
 import { ImportExportControls } from "./_components/import-export-controls";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-
-export type DeckCard = ScryfallCard & {
-  count: number;
-};
 
 const formatRules = {
   commander: { maxCopies: 1, minCards: 100, maxCards: 100 },
@@ -28,6 +24,7 @@ export default function DeckBuilderPage() {
   const [deckName, setDeckName] = useState("New Deck");
   const [format, setFormat] = useState("commander");
   const { toast } = useToast();
+  const [isImporting, startImportTransition] = useTransition();
 
   const addCardToDeck = (card: ScryfallCard) => {
     const rules = formatRules[format as keyof typeof formatRules];
@@ -80,6 +77,7 @@ export default function DeckBuilderPage() {
 
   const clearDeck = () => {
     setDeck([]);
+    setDeckName("New Deck");
     toast({
       title: "Deck Cleared",
       description: "Your deck has been emptied.",
@@ -87,18 +85,60 @@ export default function DeckBuilderPage() {
   };
 
   const importDeck = (decklist: string) => {
-    // This is a simplified parser. A real implementation would be more robust.
-    const cardNames = decklist.split('\n').filter(line => line.trim() !== '');
-    // In a real app, we would batch-fetch these cards from scryfall by name.
-    // For this prototype, we'll just clear the deck and show a message.
-    setDeck([]);
-    toast({
-      title: "Deck Imported (Prototype)",
-      description: `Decklist with ${cardNames.length} cards recognized. Card data would be fetched here.`,
+    if (!decklist.trim()) {
+        toast({
+            variant: "destructive",
+            title: "Empty Decklist",
+            description: "Please paste a decklist to import.",
+        });
+        return;
+    }
+    startImportTransition(async () => {
+        try {
+            const { found, notFound } = await importDecklist(decklist);
+            
+            if (found.length > 0) {
+                setDeck(found);
+                toast({
+                    title: "Deck Imported Successfully",
+                    description: `${found.reduce((acc, card) => acc + card.count, 0)} cards have been added to your deck.`,
+                });
+            } else {
+                 toast({
+                    variant: "destructive",
+                    title: "Import Failed",
+                    description: "No cards from your list could be found.",
+                });
+            }
+
+            if (notFound.length > 0) {
+                toast({
+                    variant: "destructive",
+                    title: "Some cards not found",
+                    description: `The following cards could not be found: ${notFound.join(", ")}. They may be misspelled or not available.`,
+                });
+            }
+
+        } catch (error) {
+            console.error(error);
+            toast({
+                variant: "destructive",
+                title: "Import Error",
+                description: "An unexpected error occurred while importing the deck.",
+            });
+        }
     });
   };
 
   const exportDeck = () => {
+    if (deck.length === 0) {
+        toast({
+            variant: "destructive",
+            title: "Empty Deck",
+            description: "There are no cards in your deck to export.",
+        });
+        return;
+    }
     const decklist = deck
       .map(card => `${card.count} ${card.name}`)
       .join('\n');
@@ -141,7 +181,7 @@ export default function DeckBuilderPage() {
             </Select>
           </div>
         </div>
-        <ImportExportControls onImport={importDeck} onExport={exportDeck} onClear={clearDeck} />
+        <ImportExportControls onImport={importDeck} onExport={exportDeck} onClear={clearDeck} isImporting={isImporting} />
       </div>
       <div className="flex-grow grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
