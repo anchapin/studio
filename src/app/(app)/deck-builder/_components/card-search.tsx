@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useCallback } from "react";
+import { useState, useTransition, useCallback, useEffect } from "react";
 import { searchScryfall, ScryfallCard } from "@/app/actions";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
@@ -30,18 +30,9 @@ export function CardSearch({ onAddCard }: CardSearchProps) {
   }, []);
 
   const [debouncedQuery] = useDebounce(query, 500);
-  
-  useState(() => {
+
+  useEffect(() => {
     handleSearch(debouncedQuery);
-  });
-  
-  // Effect for debounced search
-  useState(() => {
-    const timeoutId = setTimeout(() => {
-        handleSearch(debouncedQuery)
-    }, 500);
-    return () => clearTimeout(timeoutId);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedQuery, handleSearch]);
 
 
