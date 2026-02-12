@@ -4,6 +4,8 @@
  * Comprehensive tests for the Stack Interaction AI system.
  */
 
+import { describe, test, expect, beforeEach } from '@jest/globals';
+
 import {
   StackInteractionAI,
   StackAction,
