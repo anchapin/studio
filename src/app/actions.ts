@@ -131,12 +131,15 @@ export async function importDecklist(
       console.error(`Scryfall API error: ${res.status} ${res.statusText}`);
       const errorData = await res.json();
       console.error("Scryfall error details:", errorData);
-      const notFound = errorData?.details?.not_found?.map((item:any) => item.name) || uniqueNames;
+      // Defensively map and filter in case of malformed error response
+      const notFound = errorData?.details?.not_found?.map((item: any) => item?.name).filter(Boolean) || uniqueNames;
       return { found: [], notFound, illegal: [] };
     }
 
     const result = await res.json();
-    const notFoundNames: string[] = result.not_found.map((item: any) => item.name);
+    
+    // Defensively map and filter `not_found` array
+    const notFoundNames: string[] = (result.not_found || []).map((item: any) => item?.name).filter(Boolean);
     
     const nameToCountMap = new Map<string, number>();
     for (const req of cardRequests) {
@@ -146,12 +149,14 @@ export async function importDecklist(
       }
     }
     
-    const allFoundScryfallCards: ScryfallCard[] = result.data;
+    // Defensively filter `data` array for null/undefined entries
+    const allFoundScryfallCards: ScryfallCard[] = (result.data || []).filter(Boolean);
 
     const legalCards: DeckCard[] = [];
     const illegalCardNames: string[] = [];
 
     allFoundScryfallCards.forEach((card: ScryfallCard) => {
+        // Since we filtered, card is guaranteed to be an object. Accessing .name is now safe.
         const isLegal = format ? card.legalities?.[format] === 'legal' : true;
         const count = nameToCountMap.get(card.name.toLowerCase());
 
