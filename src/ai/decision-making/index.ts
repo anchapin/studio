@@ -19,5 +19,4 @@ export {
 export {
   runAllCombatExamples,
   combatExamples,
-  type ExamplePlan,
 } from './combat-examples';
