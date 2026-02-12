@@ -38,6 +38,9 @@ class PublicLobbyBrowser {
    * Initialize demo games for testing the browser UI
    */
   private initializeDemoGames(): void {
+    // Only run on client side
+    if (typeof window === 'undefined') return;
+
     const demoAdded = localStorage.getItem(DEMO_DATA_KEY);
     const existingGames = this.getAllStoredGames();
 
