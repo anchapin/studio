@@ -71,6 +71,9 @@ export async function getDeckReview(input: DeckReviewInput) {
     return review;
   } catch (error) {
     console.error("Error getting deck review:", error);
+    if (error instanceof Error) {
+        throw new Error(error.message);
+    }
     throw new Error("Failed to get deck review from AI.");
   }
 }

@@ -48,21 +48,21 @@ const deckReviewPrompt = ai.definePrompt({
   input: { schema: DeckReviewInputSchema },
   output: { schema: DeckReviewOutputSchema },
   model: 'googleai/gemini-1.5-pro',
-  prompt: `You are an expert Magic: The Gathering deck builder and coach. Your task is to provide a strategic analysis of the provided decklist and then propose at least two distinct, improved versions.
-
-**Format:** {{{format}}}
-
-**Decklist to review:**
-{{{decklist}}}
+  prompt: `You are an expert Magic: The Gathering deck builder and coach. Your response will be validated for correctness by an automated tool. If your response fails validation, you will be asked to try again with specific feedback on your errors.
 
 {{#if retryContext}}
-**IMPORTANT - YOU MADE A MISTAKE, PLEASE CORRECT IT:**
-You previously generated a response that had an error. Please pay close attention to the following feedback and generate a new, valid response that corrects the mistake. Do not repeat the error.
-*Error Feedback:* {{{retryContext}}}
-For example, if the feedback indicates a card is not legal, you MUST replace it with a different card that IS legal in the '{{{format}}}' format and serves a similar strategic purpose. If the feedback indicates the number of cards to add and remove do not match, you MUST correct the quantities to be equal.
+**CRITICAL: YOUR PREVIOUS ATTEMPT FAILED VALIDATION. YOU MUST CORRECT THE FOLLOWING ERRORS AND TRY AGAIN:**
+{{{retryContext}}}
+---
+Do not repeat these mistakes. For example, if the feedback indicates a card is not legal, you MUST replace it with a different card that IS legal in the '{{{format}}}' format and serves a similar strategic purpose. If the feedback indicates the number of cards to add and remove do not match, you MUST correct the quantities to be equal.
 {{/if}}
 
-**Your tasks:**
+**FORMAT: {{{format}}}**
+
+**DECKLIST TO REVIEW:**
+{{{decklist}}}
+
+**YOUR TASKS:**
 1.  **Provide a \`reviewSummary\`**: Write a comprehensive analysis covering the deck's core strategy, its strengths and weaknesses, and how it fits into the current metagame for the specified format. Assume the provided decklist is legal for the format. Focus on strategic improvements, not rule violations.
 
 2.  **Propose \`deckOptions\`**: Create at least two distinct options for improving the deck. Each option should have a clear strategic focus (e.g., making it better against aggro, or giving it more tools against control). For each option:
@@ -71,9 +71,11 @@ For example, if the feedback indicates a card is not legal, you MUST replace it 
     *   Provide a \`cardsToAdd\` array with the exact card names and quantities to add.
     *   Provide a \`cardsToRemove\` array with the exact card names and quantities to remove from the original list.
     *   Ensure all card names are spelled correctly.
-    *   **CRITICAL RULE 1: All cards in \`cardsToAdd\` MUST be legal in the '{{{format}}}' format. This is non-negotiable. Double-check legality. For example, 'Thalia, Guardian of Thraben' is NOT Standard legal.**
-    *   **CRITICAL RULE 2: The total quantity of cards in \`cardsToAdd\` MUST EXACTLY equal the total quantity of cards in \`cardsToRemove\` to maintain the deck's total card count.** For example, if you remove 3 cards, you must add exactly 3 cards. This is essential for the deck to remain valid.
-    *   **CRITICAL RULE 3: Each \`deckOption\` MUST suggest at least one card to add or one card to remove. Do not provide options with no changes.**`,
+
+**VALIDATION RULES (NON-NEGOTIABLE):**
+*   **RULE 1: LEGALITY:** All cards in \`cardsToAdd\` MUST be legal in the '{{{format}}}' format. For example, 'Thalia, Guardian of Thraben' is NOT Standard legal. Your suggestions will be checked.
+*   **RULE 2: EQUAL COUNT:** The total quantity of cards in \`cardsToAdd\` MUST EXACTLY equal the total quantity of cards in \`cardsToRemove\` to maintain the deck's total card count.
+*   **RULE 3: PROVIDE CHANGES:** Each \`deckOption\` MUST suggest at least one card to add or one card to remove. Do not provide options with no changes.`,
 });
 
 const deckReviewFlow = ai.defineFlow(
@@ -95,8 +97,8 @@ const deckReviewFlow = ai.defineFlow(
         retryContext: lastError || undefined,
       });
 
-      if (!output || !output.deckOptions) {
-        lastError = 'You did not return a valid response. Please adhere to the output schema and provide at least two deckOptions.';
+      if (!output || !output.deckOptions || output.deckOptions.length < 1) {
+        lastError = 'Your response was invalid. Please adhere to the output schema and provide at least two deckOptions.';
         continue;
       }
       
@@ -112,7 +114,7 @@ const deckReviewFlow = ai.defineFlow(
 
         if (cardsToAddFromAI.length === 0 && cardsToRemoveFromAI.length === 0) {
             currentOptionIsValid = false;
-            currentOptionError = `For option "${option.title}", you provided no cards to add or remove. Please provide at least one change.`;
+            currentOptionError = `For option "${option.title}", you provided no cards to add or remove. Every option must include at least one change.`;
         }
 
         if (currentOptionIsValid) {
@@ -120,7 +122,7 @@ const deckReviewFlow = ai.defineFlow(
             const intendedRemoveCount = cardsToRemoveFromAI.reduce((sum, c) => sum + c.quantity, 0);
             if (intendedAddCount !== intendedRemoveCount) {
               currentOptionIsValid = false;
-              currentOptionError = `For option "${option.title}", you suggested adding ${intendedAddCount} cards but removing ${intendedRemoveCount}. The counts must be equal.`;
+              currentOptionError = `For option "${option.title}", you suggested adding ${intendedAddCount} cards but removing ${intendedRemoveCount}. These counts must be exactly equal.`;
             }
         }
 
@@ -138,7 +140,7 @@ const deckReviewFlow = ai.defineFlow(
 
             if (errors.length > 0) {
                 currentOptionIsValid = false;
-                currentOptionError = `For option "${option.title}", your card suggestions have errors: ${errors.join(' ')} Please suggest only valid, legal cards for the ${input.format} format.`;
+                currentOptionError = `For option "${option.title}", your card suggestions had errors: ${errors.join(' ')} Please suggest only valid, legal cards for the ${input.format} format.`;
             }
         }
 
@@ -150,26 +152,24 @@ const deckReviewFlow = ai.defineFlow(
       }
 
       if (validOptions.length > 0) {
-        // We have some good suggestions. Return them, even if it's just one.
+        // We have some good suggestions. Return them.
         return {
           ...output,
           deckOptions: validOptions,
         };
       }
 
-      // If we're here, ALL options were invalid (or no options were provided).
+      // If we're here, ALL options were invalid.
       if (validationErrors.length > 0) {
-        lastError = `None of your deck suggestions were valid. Please fix these errors and try again: ${validationErrors.join(' | ')}`;
-      } else if (!output.deckOptions || output.deckOptions.length === 0) {
-        lastError = "You did not suggest any deck options. Please provide at least two distinct options as requested in the prompt."
+        lastError = `Your suggestions had the following errors:\n- ${validationErrors.join('\n- ')}`;
       } else {
-        lastError = 'You provided deck options, but none of them were valid for an unknown reason. Please try again, paying close attention to all instructions.'
+        lastError = 'You provided deck options, but none of them were valid for an unknown reason. Please try again, paying close attention to all validation rules.'
       }
       
       // Loop will continue with the new `lastError`.
     }
 
     // If we exit the loop, it means we failed after maxAttempts.
-    throw new Error(`AI failed to generate valid deck suggestions after ${maxAttempts} attempts. Last error: ${lastError}`);
+    throw new Error(`The AI coach failed to generate valid deck suggestions after multiple attempts. The last error was: ${lastError}`);
   }
 );
