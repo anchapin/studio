@@ -98,98 +98,89 @@ const deckReviewFlow = ai.defineFlow(
       });
 
       if (!output || !Array.isArray(output.deckOptions) || output.deckOptions.length < 1) {
-        lastError = 'Your response was invalid. Please adhere to the output schema and provide at least two deckOptions.';
+        lastError = 'Your response was invalid. Please adhere to the output schema and provide at least one valid deckOption.';
         continue;
       }
       
-      const validOptions = [];
-      const validationErrors = [];
+      const allValidationErrors: string[] = [];
+      const allValidOptions: DeckReviewOutput['deckOptions'] = [];
 
-      const filteredDeckOptions = output.deckOptions.filter(opt => opt && typeof opt === 'object');
+      for (const option of output.deckOptions) {
+        if (!option || typeof option !== 'object' || !option.title) {
+            allValidationErrors.push('An entire deck option was malformed or missing a title.');
+            continue;
+        }
 
-      for (const option of filteredDeckOptions) {
-        let currentOptionIsValid = true;
-        let currentOptionError = '';
-
-        const cardIsValid = (c: any): c is { name: string; quantity: number } => {
-          if (!c || typeof c !== 'object') return false;
-          if (typeof c.name !== 'string' || c.name.trim() === '') return false;
-          if (typeof c.quantity !== 'number') return false;
-          return true;
-        };
+        const cardsToAddRaw = option.cardsToAdd || [];
+        const cardsToRemoveRaw = option.cardsToRemove || [];
         
-        const cardsToAddRaw = Array.isArray(option.cardsToAdd) ? option.cardsToAdd : [];
-        const cardsToRemoveRaw = Array.isArray(option.cardsToRemove) ? option.cardsToRemove : [];
-
-        const sanitizedCardsToAdd = cardsToAddRaw.filter(cardIsValid);
-        const sanitizedCardsToRemove = cardsToRemoveRaw.filter(cardIsValid);
-        
-        if (sanitizedCardsToAdd.length !== cardsToAddRaw.length) {
-          currentOptionIsValid = false;
-          currentOptionError = `For option "${option.title || 'Untitled'}", your 'cardsToAdd' list contained invalid entries. Each card must be an object with a non-empty 'name' (string) and a 'quantity' (number). Please correct the list.`;
-        }
-        
-        if (sanitizedCardsToRemove.length !== cardsToRemoveRaw.length) {
-          currentOptionIsValid = false;
-          currentOptionError += (currentOptionError ? ' ' : '') + `For option "${option.title || 'Untitled'}", your 'cardsToRemove' list contained invalid entries. Each card must be an object with a non-empty 'name' (string) and a 'quantity' (number). Please correct the list.`;
+        if (!Array.isArray(cardsToAddRaw) || !Array.isArray(cardsToRemoveRaw)) {
+            allValidationErrors.push(`For option "${option.title}", the 'cardsToAdd' or 'cardsToRemove' field was not a list.`);
+            continue;
         }
 
-        if (currentOptionIsValid && sanitizedCardsToAdd.length === 0 && sanitizedCardsToRemove.length === 0) {
-            currentOptionIsValid = false;
-            currentOptionError = `For option "${option.title || 'Untitled'}", you provided no cards to add or remove. Every option must include at least one change.`;
+        const sanitizedCardsToAdd = cardsToAddRaw.filter(
+            (c: any): c is { name: string; quantity: number } => c && typeof c === 'object' && typeof c.name === 'string' && c.name.trim() !== '' && typeof c.quantity === 'number' && c.quantity > 0
+        );
+        const sanitizedCardsToRemove = cardsToRemoveRaw.filter(
+            (c: any): c is { name: string; quantity: number } => c && typeof c === 'object' && typeof c.name === 'string' && c.name.trim() !== '' && typeof c.quantity === 'number' && c.quantity > 0
+        );
+
+        if (sanitizedCardsToAdd.length !== cardsToAddRaw.length || sanitizedCardsToRemove.length !== cardsToRemoveRaw.length) {
+          allValidationErrors.push(`For option "${option.title}", one of your card lists contained malformed entries. Each card must be an object with a non-empty 'name' and a 'quantity' greater than 0.`);
+          continue;
         }
 
-        if (currentOptionIsValid) {
-            const intendedAddCount = sanitizedCardsToAdd.reduce((sum, c) => sum + c.quantity, 0);
-            const intendedRemoveCount = sanitizedCardsToRemove.reduce((sum, c) => sum + c.quantity, 0);
-            if (intendedAddCount !== intendedRemoveCount) {
-              currentOptionIsValid = false;
-              currentOptionError = `For option "${option.title || 'Untitled'}", you suggested adding ${intendedAddCount} cards but removing ${intendedRemoveCount}. These counts must be exactly equal.`;
-            }
+        const addCount = sanitizedCardsToAdd.reduce((sum, c) => sum + c.quantity, 0);
+        const removeCount = sanitizedCardsToRemove.reduce((sum, c) => sum + c.quantity, 0);
+
+        if (addCount !== removeCount) {
+            allValidationErrors.push(`For option "${option.title}", you suggested adding ${addCount} cards but removing ${removeCount}. These counts must be equal.`);
+            continue;
         }
 
-        if (currentOptionIsValid && sanitizedCardsToAdd.length > 0) {
+        if (sanitizedCardsToAdd.length === 0 && sanitizedCardsToRemove.length === 0) {
+            allValidationErrors.push(`For option "${option.title}", you provided no cards to add or remove. Every option must include at least one change.`);
+            continue;
+        }
+
+        if (sanitizedCardsToAdd.length > 0) {
             const decklistForImport = sanitizedCardsToAdd.map(c => `${c.quantity} ${c.name}`).join('\n');
             const importResult = await importDecklist(decklistForImport, input.format);
             
-            const errors = [];
+            const legalityErrors = [];
             if (importResult.notFound.length > 0) {
-                errors.push(`I could not find these cards: ${importResult.notFound.join(', ')}.`);
+                legalityErrors.push(`these cards could not be found: ${importResult.notFound.join(', ')}.`);
             }
             if (importResult.illegal.length > 0) {
-                errors.push(`These cards are not legal in ${input.format}: ${importResult.illegal.join(', ')}.`);
+                legalityErrors.push(`these cards are not legal in ${input.format}: ${importResult.illegal.join(', ')}.`);
             }
 
-            if (errors.length > 0) {
-                currentOptionIsValid = false;
-                currentOptionError = `For option "${option.title || 'Untitled'}", your card suggestions had errors: ${errors.join(' ')} Please suggest only valid, legal cards for the ${input.format} format.`;
+            if (legalityErrors.length > 0) {
+                allValidationErrors.push(`For option "${option.title}", your card suggestions had errors: ${legalityErrors.join(' ')}`);
+                continue;
             }
         }
 
-        if (currentOptionIsValid) {
-          validOptions.push({
+        allValidOptions.push({
             ...option,
             cardsToAdd: sanitizedCardsToAdd,
             cardsToRemove: sanitizedCardsToRemove,
-          });
-        } else {
-          validationErrors.push(currentOptionError);
-        }
+        });
       }
 
-      if (validOptions.length > 0) {
+      if (allValidOptions.length > 0) {
         return {
           ...output,
-          deckOptions: validOptions,
+          deckOptions: allValidOptions,
         };
       }
 
-      if (validationErrors.length > 0) {
-        lastError = `Your suggestions had the following errors:\n- ${validationErrors.join('\n- ')}`;
+      if (allValidationErrors.length > 0) {
+        lastError = `Your suggestions had the following errors:\n- ${allValidationErrors.join('\n- ')}`;
       } else {
         lastError = 'You provided deck options, but none of them were valid for an unknown reason. Please try again, paying close attention to all validation rules.'
       }
-      
     }
 
     throw new Error(`The AI coach failed to generate valid deck suggestions after ${maxAttempts} attempts. The last error was: ${lastError}`);
