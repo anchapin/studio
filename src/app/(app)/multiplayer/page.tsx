@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 
 const mockGames = [
     { id: '1', name: "Casual Commander", host: "PlayerOne", players: "3/4", status: "Waiting" },
@@ -29,8 +30,9 @@ export default function MultiplayerPage() {
                     <CardDescription>Create a new game lobby and invite your friends.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <Input placeholder="Game Name (e.g., 'Friday Night Magic')" />
-                    <Button className="w-full">Create Lobby</Button>
+                    <Link href="/multiplayer/host">
+                        <Button className="w-full">Create Lobby</Button>
+                    </Link>
                 </CardContent>
             </Card>
             <Card>
