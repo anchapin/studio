@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Download, Upload, Trash2, Loader2 } from "lucide-react";
+import { Download, Upload, Trash2, Loader2, Save } from "lucide-react";
 import { useState } from "react";
 import {
   AlertDialog,
@@ -30,10 +31,12 @@ interface ImportExportControlsProps {
   onImport: (decklist: string) => void;
   onExport: () => void;
   onClear: () => void;
+  onSave: () => void;
+  isDeckSaved: boolean;
   isImporting?: boolean;
 }
 
-export function ImportExportControls({ onImport, onExport, onClear, isImporting = false }: ImportExportControlsProps) {
+export function ImportExportControls({ onImport, onExport, onClear, onSave, isDeckSaved, isImporting = false }: ImportExportControlsProps) {
   const [importText, setImportText] = useState("");
 
   const handleImportClick = () => {
@@ -42,6 +45,10 @@ export function ImportExportControls({ onImport, onExport, onClear, isImporting 
 
   return (
     <div className="flex items-center gap-2">
+      <Button variant="outline" size="sm" onClick={onSave} disabled={isDeckSaved}>
+        <Save className="mr-2" />
+        {isDeckSaved ? 'Saved' : 'Save'}
+      </Button>
       <Dialog onOpenChange={(open) => !open && setImportText("")}>
         <DialogTrigger asChild>
           <Button variant="outline" size="sm">

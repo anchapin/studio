@@ -1,13 +1,17 @@
+
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { ScryfallCard, DeckCard, importDecklist } from "@/app/actions";
+import { ScryfallCard, DeckCard, importDecklist, SavedDeck } from "@/app/actions";
 import { CardSearch } from "./_components/card-search";
 import { DeckList } from "./_components/deck-list";
 import { ImportExportControls } from "./_components/import-export-controls";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { useLocalStorage } from "@/hooks/use-local-storage";
+import { SavedDecksList } from "./_components/saved-decks-list";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const formatRules = {
   commander: { maxCopies: 1, minCards: 100, maxCards: 100 },
@@ -23,13 +27,50 @@ export default function DeckBuilderPage() {
   const [deck, setDeck] = useState<DeckCard[]>([]);
   const [deckName, setDeckName] = useState("New Deck");
   const [format, setFormat] = useState("commander");
+  const [activeDeckId, setActiveDeckId] = useState<string | null>(null);
+  const [isDeckSaved, setIsDeckSaved] = useState(false);
+  const [savedDecks, setSavedDecks] = useLocalStorage<SavedDeck[]>('saved-decks', []);
+
   const { toast } = useToast();
   const [isImporting, startImportTransition] = useTransition();
+  
+  useEffect(() => {
+    // If there is an active deck, check if it's "dirty"
+    if (activeDeckId) {
+      const activeDeck = savedDecks.find(d => d.id === activeDeckId);
+      if (activeDeck) {
+        const isNameChanged = activeDeck.name !== deckName;
+        const isFormatChanged = activeDeck.format !== format;
+        const isCardsChanged = JSON.stringify(activeDeck.cards.map(c => ({ id: c.id, count: c.count })).sort((a,b) => a.id.localeCompare(b.id))) !== JSON.stringify(deck.map(c => ({ id: c.id, count: c.count })).sort((a,b) => a.id.localeCompare(b.id)));
+        
+        setIsDeckSaved(!isNameChanged && !isFormatChanged && !isCardsChanged);
+      }
+    } else {
+        // New deck is never "saved"
+        setIsDeckSaved(false);
+    }
+  }, [deck, deckName, format, activeDeckId, savedDecks]);
+
+
+  const handleDeckChange = (updater: (prevDeck: DeckCard[]) => DeckCard[]) => {
+    setDeck(updater);
+    setIsDeckSaved(false);
+  };
+  
+  const handleDeckNameChange = (name: string) => {
+    setDeckName(name);
+    setIsDeckSaved(false);
+  };
+
+  const handleFormatChange = (newFormat: string) => {
+    setFormat(newFormat);
+    setIsDeckSaved(false);
+  }
 
   const addCardToDeck = (card: ScryfallCard) => {
     const rules = formatRules[format as keyof typeof formatRules];
 
-    setDeck((prevDeck) => {
+    handleDeckChange((prevDeck) => {
       const existingCard = prevDeck.find((c) => c.id === card.id);
       const isBasicLand = card.type_line?.includes("Basic Land");
       
@@ -63,7 +104,7 @@ export default function DeckBuilderPage() {
   };
 
   const removeCardFromDeck = (cardId: string) => {
-    setDeck((prevDeck) => {
+    handleDeckChange((prevDeck) => {
       const existingCard = prevDeck.find((c) => c.id === cardId);
       if (existingCard && existingCard.count > 1) {
         return prevDeck.map((c) =>
@@ -78,6 +119,7 @@ export default function DeckBuilderPage() {
   const clearDeck = () => {
     setDeck([]);
     setDeckName("New Deck");
+    setActiveDeckId(null);
     toast({
       title: "Deck Cleared",
       description: "Your deck has been emptied.",
@@ -93,6 +135,7 @@ export default function DeckBuilderPage() {
         });
         return;
     }
+    setActiveDeckId(null);
     startImportTransition(async () => {
         try {
             const { found, notFound } = await importDecklist(decklist);
@@ -158,6 +201,52 @@ export default function DeckBuilderPage() {
     });
   };
 
+  const saveDeck = () => {
+    if (deck.length === 0) {
+      toast({ variant: 'destructive', title: 'Cannot Save Empty Deck' });
+      return;
+    }
+    const now = new Date().toISOString();
+    if (activeDeckId) {
+      // Update existing deck
+      const updatedDecks = savedDecks.map(d =>
+        d.id === activeDeckId ? { ...d, name: deckName, format, cards: deck, updatedAt: now } : d
+      );
+      setSavedDecks(updatedDecks);
+      toast({ title: 'Deck Updated', description: `"${deckName}" has been updated.` });
+    } else {
+      // Create new deck
+      const newDeck: SavedDeck = {
+        id: crypto.randomUUID(),
+        name: deckName,
+        format,
+        cards: deck,
+        createdAt: now,
+        updatedAt: now,
+      };
+      setSavedDecks([...savedDecks, newDeck]);
+      setActiveDeckId(newDeck.id);
+      toast({ title: 'Deck Saved', description: `"${deckName}" has been saved.` });
+    }
+    setIsDeckSaved(true);
+  }
+
+  const loadDeck = (deckToLoad: SavedDeck) => {
+    setDeck(deckToLoad.cards);
+    setDeckName(deckToLoad.name);
+    setFormat(deckToLoad.format);
+    setActiveDeckId(deckToLoad.id);
+    toast({ title: 'Deck Loaded', description: `Now editing "${deckToLoad.name}".` });
+  }
+
+  const deleteDeck = (deckId: string) => {
+    setSavedDecks(savedDecks.filter(d => d.id !== deckId));
+    if (activeDeckId === deckId) {
+      clearDeck();
+    }
+    toast({ title: 'Deck Deleted' });
+  }
+
   return (
     <div className="flex h-full min-h-svh w-full flex-col p-4 md:p-6">
       <div className="flex items-center justify-between gap-4 mb-4">
@@ -165,7 +254,7 @@ export default function DeckBuilderPage() {
           <h1 className="font-headline text-3xl font-bold">Deck Builder</h1>
           <div className="flex items-center gap-2">
             <Label htmlFor="format-select" className="text-muted-foreground">Format</Label>
-            <Select value={format} onValueChange={setFormat}>
+            <Select value={format} onValueChange={handleFormatChange}>
                 <SelectTrigger id="format-select" className="w-40 capitalize">
                     <SelectValue placeholder="Select format" />
                 </SelectTrigger>
@@ -181,19 +270,27 @@ export default function DeckBuilderPage() {
             </Select>
           </div>
         </div>
-        <ImportExportControls onImport={importDeck} onExport={exportDeck} onClear={clearDeck} isImporting={isImporting} />
+        <ImportExportControls onImport={importDeck} onExport={exportDeck} onClear={clearDeck} onSave={saveDeck} isDeckSaved={isDeckSaved} isImporting={isImporting} />
       </div>
       <div className="flex-grow grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
             <CardSearch onAddCard={addCardToDeck} />
         </div>
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 flex flex-col gap-6">
             <DeckList 
                 deck={deck} 
                 deckName={deckName}
-                onDeckNameChange={setDeckName}
+                onDeckNameChange={handleDeckNameChange}
                 onRemoveCard={removeCardFromDeck} 
             />
+            <Card>
+                <CardHeader>
+                    <CardTitle>Saved Decks</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <SavedDecksList savedDecks={savedDecks} onLoadDeck={loadDeck} onDeleteDeck={deleteDeck} activeDeckId={activeDeckId} />
+                </CardContent>
+            </Card>
         </div>
       </div>
     </div>

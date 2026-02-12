@@ -1,3 +1,4 @@
+
 "use server";
 
 import { reviewDeck, DeckReviewInput } from "@/ai/flows/ai-deck-coach-review";
@@ -21,9 +22,18 @@ export interface ScryfallCard {
   color_identity: string[];
 }
 
-export type DeckCard = ScryfallCard & {
+export interface DeckCard extends ScryfallCard {
   count: number;
 };
+
+export interface SavedDeck {
+  id: string;
+  name: string;
+  format: string;
+  cards: DeckCard[];
+  createdAt: string;
+  updatedAt: string;
+}
 
 
 export async function searchScryfall(query: string): Promise<ScryfallCard[]> {

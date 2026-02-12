@@ -1,16 +1,18 @@
+
 "use client";
 
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { getDeckReview } from "@/app/actions";
+import { getDeckReview, SavedDeck } from "@/app/actions";
 import type { DeckReviewOutput } from "@/ai/flows/ai-deck-coach-review";
 import { Bot, Loader2 } from "lucide-react";
 import { ReviewDisplay } from "./_components/review-display";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { DeckSelector } from "@/components/deck-selector";
 
 export default function DeckCoachPage() {
   const [decklist, setDecklist] = useState("");
@@ -31,6 +33,7 @@ export default function DeckCoachPage() {
 
     startTransition(async () => {
       try {
+        setReview(null);
         const result = await getDeckReview({ decklist, format });
         setReview(result);
       } catch (error) {
@@ -43,6 +46,13 @@ export default function DeckCoachPage() {
       }
     });
   };
+  
+  const handleDeckSelect = (deck: SavedDeck) => {
+    setFormat(deck.format);
+    const decklistStr = deck.cards.map(c => `${c.count} ${c.name}`).join('\n');
+    setDecklist(decklistStr);
+    toast({ title: 'Deck Loaded', description: `Loaded "${deck.name}" for review.` });
+  }
 
   return (
     <div className="flex-1 p-4 md:p-6">
@@ -56,8 +66,22 @@ export default function DeckCoachPage() {
         <Card>
           <CardHeader>
             <CardTitle>Your Decklist</CardTitle>
+            <CardDescription>Select a saved deck or paste one below.</CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="space-y-2 mb-4">
+              <DeckSelector onDeckSelect={handleDeckSelect} />
+            </div>
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">
+                  Or
+                </span>
+              </div>
+            </div>
             <div className="space-y-2 mb-4">
               <Label htmlFor="format-select">Format</Label>
               <Select value={format} onValueChange={setFormat} disabled={isPending}>
