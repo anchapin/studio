@@ -19,6 +19,7 @@ import {
   hasLethalDamage,
 } from "./card-instance";
 import { createTurn, advancePhase, startNextTurn, initializeTurnOrder } from "./turn-phases";
+import { createPlayerZones, createSharedZones } from "./zones";
 
 /**
  * Generate a unique player ID
@@ -99,7 +100,7 @@ export function createInitialGameState(
   // Create players
   const playerIds: PlayerId[] = [];
   playerNames.forEach((name) => {
-    const player = createPlayer(name, startingLife, isCommander);
+    const player = createPlayer(name, startingLife, _isCommander);
     players.set(player.id, player);
     playerIds.push(player.id);
 
