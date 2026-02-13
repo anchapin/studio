@@ -6,7 +6,12 @@ import { generateAIOpponentDeck, AIOpponentDeckGenerationInput } from "@/ai/flow
 
 export interface ScryfallCard {
   id: string;
+  oracle_id?: string;
   name: string;
+  cmc?: number;
+  power?: string;
+  toughness?: string;
+  keywords?: string[];
   image_uris?: {
     small: string;
     normal: string;
@@ -16,15 +21,11 @@ export interface ScryfallCard {
     border_crop: string;
   };
   mana_cost?: string;
-  cmc?: number;
   type_line?: string;
   oracle_text?: string;
   colors?: string[];
   color_identity: string[];
   legalities?: { [format: string]: string };
-  // Power/toughness for creatures
-  power?: string;
-  toughness?: string;
   // Card faces for double-faced/transform cards
   card_faces?: Array<{
     name: string;
