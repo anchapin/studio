@@ -18,8 +18,11 @@ npm run dev
 # AI development environment (Genkit dev UI)
 npm run genkit:dev
 
+# AI development with hot-reload (restarts on file changes)
+npm run genkit:watch
+
 # Build for production
-npm run build
+NODE_ENV=production npm run build
 
 # Start production server
 npm start
@@ -62,8 +65,9 @@ AI functionality is implemented using Google's Genkit framework:
 
 AI flows use:
 - Model: `gemini-1.5-flash-latest`
-- Zod schemas for input validation and structured output
+- Zod schemas for input validation and structured output (import from `genkit`, not `zod`)
 - Retry logic for handling AI errors
+- Server actions (`'use server'`) for client-side invocation
 
 ### UI Components
 
@@ -91,6 +95,8 @@ When adding card-related functionality, ensure types align with Scryfall's API r
 
 Magic: The Gathering rules are defined in `/src/lib/game-rules.ts`. This includes format definitions, deck construction rules, and legality checks. When modifying game behavior, update this file accordingly.
 
+Note: The `game-rules.ts` file imports a `GameState` type from a non-existent `./game-state` file. This should be resolved if implementing game state management.
+
 ## AI Development
 
 The Genkit dev UI provides tools for testing AI flows:
@@ -101,3 +107,18 @@ The Genkit dev UI provides tools for testing AI flows:
 ## Deployment
 
 The project is configured for Firebase App Hosting via `apphosting.yaml`. No additional build configuration is required beyond the standard Next.js build process.
+
+## Common Patterns
+
+### Class Name Merging
+Use the `cn()` utility function from `@/lib/utils` to merge Tailwind CSS classes. This is the standard pattern from Shadcn/ui:
+```ts
+import { cn } from '@/lib/utils';
+const className = cn('base-class', conditional && 'conditional-class');
+```
+
+### Dark Mode
+The app uses dark mode by default (see `src/app/layout.tsx`). Avoid adding dark mode toggles unless explicitly requested.
+
+### Dependency Patches
+The project uses `patch-package` for applying fixes to dependencies. Patches are stored in `patches/` directory.
