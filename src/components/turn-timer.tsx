@@ -169,8 +169,7 @@ export function TurnTimer({
       {/* Progress bar */}
       <Progress
         value={progress}
-        className="h-2"
-        indicatorClassName={getProgressColor()}
+        className={cn("h-2", getProgressColor())}
       />
 
       {/* Warning indicator */}
@@ -216,8 +215,7 @@ export function CompactTimer({
       <Clock className={cn('w-3 h-3', getColor())} />
       <Progress
         value={progress}
-        className="w-16 h-1.5"
-        indicatorClassName={cn(
+        className={cn("w-16 h-1.5",
           timerState === 'warning' && 'bg-yellow-500',
           timerState === 'expired' && 'bg-red-500'
         )}

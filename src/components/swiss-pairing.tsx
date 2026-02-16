@@ -19,7 +19,7 @@ import {
   ArrowRight,
   BarChart3,
   History,
-  Tie
+  Split
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -360,7 +360,7 @@ function SwissMatchCard({ match, onResultSelect }: SwissMatchCardProps) {
               className="flex-1"
               onClick={() => onResultSelect('draw')}
             >
-              <Tie className="w-3 h-3 mr-1" />
+              <Split className="w-3 h-3 mr-1" />
               Draw
             </Button>
             <Button 

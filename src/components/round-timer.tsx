@@ -167,7 +167,7 @@ export function RoundTimerWidget({
               {formatLongTime(status.roundTimeRemaining)}
             </span>
           </div>
-          <Progress value={roundProgress} className="h-2" indicatorClassName={getProgressColor()} />
+          <Progress value={roundProgress} className={cn("h-2", getProgressColor())} />
         </div>
 
         {/* Turn Time (only shown during player's turn) */}
@@ -179,7 +179,7 @@ export function RoundTimerWidget({
                 {formatTime(status.turnTimeRemaining)}
               </span>
             </div>
-            <Progress value={turnProgress} className="h-2" indicatorClassName={getProgressColor()} />
+            <Progress value={turnProgress} className={cn("h-2", getProgressColor())} />
           </div>
         )}
 
