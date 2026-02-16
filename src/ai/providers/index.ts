@@ -6,7 +6,7 @@
  * allowing easy switching between different AI backends.
  */
 
-import { genkit } from 'genkit';
+import { genkit, type Genkit } from 'genkit';
 import { googleAI } from '@genkit-ai/google-genai';
 
 /**
@@ -71,13 +71,13 @@ let currentConfig: AIProviderConfig = {
 /**
  * Current AI instance
  */
-let currentAI: ReturnType<typeof genkit> | null = null;
+let currentAI: Genkit | null = null;
 
 /**
  * Initialize the AI with a specific provider
  * This replaces the hardcoded Google AI initialization
  */
-export function initializeAIProvider(config?: Partial<AIProviderConfig>): typeof genkit {
+export function initializeAIProvider(config?: Partial<AIProviderConfig>): Genkit {
   const finalConfig = { ...currentConfig, ...config };
   currentConfig = finalConfig;
 
@@ -117,7 +117,7 @@ export function initializeAIProvider(config?: Partial<AIProviderConfig>): typeof
  * Get the current AI instance
  * Falls back to Google AI if not initialized
  */
-export function getAI(): typeof genkit {
+export function getAI(): Genkit {
   if (!currentAI) {
     return initializeAIProvider();
   }

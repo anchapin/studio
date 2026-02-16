@@ -131,7 +131,7 @@ export function createInitialGameState(
     combat: {
       inCombatPhase: false,
       attackers: [],
-      blockers: [],
+      blockers: new Map(),
       remainingCombatPhases: 0,
     },
     waitingChoice: null,

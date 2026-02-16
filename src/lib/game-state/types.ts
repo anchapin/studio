@@ -298,8 +298,8 @@ export interface Combat {
   inCombatPhase: boolean;
   /** Attacking creatures */
   attackers: Attacker[];
-  /** Blocking creatures */
-  blockers: Blocker[];
+  /** Blocking creatures - Map from attacker ID to blockers */
+  blockers: Map<CardInstanceId, Blocker[]>;
   /** Remaining combat phases to process */
   remainingCombatPhases: number;
 }
