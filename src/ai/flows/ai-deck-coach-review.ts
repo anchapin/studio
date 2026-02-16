@@ -2,13 +2,16 @@
 'use server';
 /**
  * @fileOverview An AI deck coach for Magic: The Gathering.
+ * 
+ * This module has been updated to use the provider-agnostic AI architecture.
+ * Issue #97: Migrate from hardcoded Gemini-only AI to provider-agnostic architecture
  *
  * - reviewDeck - A function that reviews a Magic: The Gathering decklist for a given format.
  * - DeckReviewInput - The input type for the reviewDeck function.
  * - DeckReviewOutput - The return type for the reviewDeck function.
  */
 
-import { ai, googleAiPlugin } from '@/ai/genkit';
+import { getAI, getModelString } from '@/ai/providers';
 import { z } from 'genkit';
 import { validateCardLegality } from '@/app/actions';
 
@@ -44,9 +47,15 @@ export async function reviewDeck(
   return result;
 }
 
+// Get the AI instance using the provider-agnostic approach
+const ai = getAI();
+
+// Use provider-agnostic model string
+const currentModel = getModelString();
+
 const deckReviewPrompt = ai.definePrompt({
   name: 'deckReviewPrompt',
-  model: 'gemini-1.5-flash-latest',
+  model: currentModel,
   input: { schema: DeckReviewInputSchema },
   output: { schema: DeckReviewOutputSchema },
   prompt: `You are an expert Magic: The Gathering deck builder and coach. Your response will be validated for correctness by an automated tool. If your response fails validation, you will be asked to try again with specific feedback on your errors.
@@ -92,6 +101,10 @@ const deckReviewFlow = ai.defineFlow(
 
     while (attempts < maxAttempts) {
       attempts++;
+      
+      // Get fresh AI instance and model for each attempt (allows runtime switching)
+      const aiInstance = getAI();
+      const model = getModelString();
       
       const { output } = await deckReviewPrompt({
         ...input,
