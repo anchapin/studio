@@ -1,10 +1,15 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
+import { ServiceWorkerRegistration } from '@/components/service-worker-registration';
 
 export const metadata: Metadata = {
   title: 'Planar Nexus',
   description: 'A Magic: The Gathering digital tabletop experience.',
+  manifest: '/manifest.json',
+  theme_color: '#4f46e5',
+  appleMobileWebAppCapable: 'yes',
+  appleMobileWebAppStatusBarStyle: 'black-translucent',
 };
 
 export default function RootLayout({
@@ -23,6 +28,7 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased" suppressHydrationWarning>
+        <ServiceWorkerRegistration />
         {children}
         <Toaster />
       </body>
