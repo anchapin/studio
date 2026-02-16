@@ -6,6 +6,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,7 @@ const formatDisplayNames: Record<GameFormat, string> = {
 };
 
 export default function BrowseGamesPage() {
+  const router = useRouter();
   const [games, setGames] = useState<PublicGameInfo[]>([]);
   const [filteredGames, setFilteredGames] = useState<PublicGameInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -85,10 +87,8 @@ export default function BrowseGamesPage() {
   };
 
   const handleJoinGame = (gameCode: string) => {
-    // Store the game code and redirect to join page
-    // For now, redirect to multiplayer main page with the code
-    // In production, this would navigate to a dedicated join/game page
-    alert(`Join game with code: ${gameCode}\n\nNote: Join functionality is not yet implemented. Use this code on the main multiplayer page.`);
+    // Navigate to join page with the game code
+    router.push(`/multiplayer/join?code=${gameCode}`);
   };
 
   const isGameFull = (game: PublicGameInfo) => {
@@ -118,7 +118,7 @@ export default function BrowseGamesPage() {
       <header className="mb-6">
         <Button
           variant="ghost"
-          onClick={() => window.location.href = '/multiplayer'}
+          onClick={() => router.push('/multiplayer')}
           className="mb-4"
         >
           ← Back
@@ -277,7 +277,7 @@ export default function BrowseGamesPage() {
                 </Button>
               )}
               {games.length === 0 && (
-                <Button onClick={() => window.location.href = '/multiplayer/host'} className="ml-2">
+                <Button onClick={() => router.push('/multiplayer/host')} className="ml-2">
                   Create a Game
                 </Button>
               )}
