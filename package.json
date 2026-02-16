@@ -2,6 +2,10 @@
   "name": "nextn",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/anchapin/planar-nexus/issues"
+  },
   "scripts": {
     "dev": "next dev --turbopack -p 9002",
     "genkit:dev": "genkit start -- tsx src/ai/dev.ts",

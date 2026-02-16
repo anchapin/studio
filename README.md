@@ -1,5 +1,7 @@
 # Planar Nexus
 
+**Disclaimer**: Planar Nexus is not affiliated with, endorsed by, or connected to Wizards of the Coast, Magic: The Gathering, or any of their affiliates. All Magic: The Gathering content is trademarked and copyrighted by Wizards of the Coast. This project is provided for educational and entertainment purposes only.
+
 A digital Magic: The Gathering tabletop experience with deck building, AI coaching, and multiplayer functionality.
 
 ## Project Overview
@@ -203,6 +205,18 @@ To start development, take a look at `src/app/page.tsx` and `CLAUDE.md` for deve
 - [ ] Accessibility improvements (screen reader support, keyboard navigation)
 - [ ] Mobile responsiveness improvements
 - [ ] Offline mode (PWA with local caching)
+
+---
+
+---
+
+## Legal Notices
+
+**Trademark Notice**: Magic: The Gathering, Magic, MTG, and all related characters and elements are trademarks of Wizards of the Coast, LLC.
+
+**Copyright Notice**: All card images, text, and game rules are property of Wizards of the Coast. This project uses the Scryfall API for card data but does not host any copyrighted materials.
+
+**No Affiliation**: This project is not affiliated with, endorsed by, or connected to Wizards of the Coast. It is an independent, non-commercial project created for educational and entertainment purposes.
 
 ---
 
