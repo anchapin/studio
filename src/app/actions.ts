@@ -93,6 +93,10 @@ export async function searchScryfall(query: string): Promise<ScryfallCard[]> {
   }
 }
 
+export async function searchCards(query: string, format: string = "commander"): Promise<ScryfallCard[]> {
+  return searchScryfall(query);
+}
+
 export async function getDeckReview(input: DeckReviewInput) {
   try {
     const review = await reviewDeck(input);

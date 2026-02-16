@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +28,7 @@ interface JoinState {
   game: PublicGameInfo | null;
 }
 
-export default function JoinGamePage() {
+function JoinGameContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -380,5 +380,32 @@ export default function JoinGamePage() {
         Deck selection is stored locally for demonstration.
       </p>
     </div>
+  );
+}
+
+function JoinLoading() {
+  return (
+    <div className="flex-1 p-4 md:p-6 max-w-md mx-auto">
+      <Card>
+        <CardHeader>
+          <CardTitle>Join a Game</CardTitle>
+          <CardDescription>Loading...</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="animate-pulse space-y-4">
+            <div className="h-10 bg-muted rounded"></div>
+            <div className="h-10 bg-muted rounded"></div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+export default function JoinGamePage() {
+  return (
+    <Suspense fallback={<JoinLoading />}>
+      <JoinGameContent />
+    </Suspense>
   );
 }
