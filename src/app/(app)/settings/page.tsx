@@ -9,7 +9,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Eye, EyeOff, Trash2, Check, X, Loader2, Save, RefreshCw } from "lucide-react";
+import { Eye, EyeOff, Trash2, Check, X, Loader2, Save, RefreshCw, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 import type { AIProvider } from "@/ai/providers";
 import { SoundSettings } from "@/components/sound-settings";
 import {
@@ -32,6 +33,15 @@ import {
   type ProviderKeyStatus,
 } from "@/lib/api-key-storage";
 import { getAvailableProviders, getModelOptions } from "@/ai/providers";
+import {
+  getUsageSummary,
+  getAllUsageStats,
+  resetAllUsage,
+  exportUsageData,
+  formatCost,
+  formatTokens,
+  type ProviderUsageStats,
+} from "@/lib/usage-tracking";
 
 /**
  * Provider display names
@@ -52,6 +62,189 @@ const PROVIDER_COLORS: Record<AIProvider, string> = {
   anthropic: "bg-purple-500",
   custom: "bg-gray-500",
 };
+
+/**
+ * Usage Tracking Tab Component
+ */
+function UsageTrackingTab() {
+  const [stats, setStats] = useState<ProviderUsageStats[]>([]);
+  const [summary, setSummary] = useState<{ totalRequests: number; totalTokens: number; totalCost: number } | null>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("30");
+  const [isExporting, setIsExporting] = useState(false);
+
+  useEffect(() => {
+    loadStats();
+  }, [selectedPeriod]);
+
+  function loadStats() {
+    const allStats = getAllUsageStats();
+    setStats(allStats);
+    const usageSummary = getUsageSummary(parseInt(selectedPeriod));
+    setSummary({
+      totalRequests: usageSummary.totalRequests,
+      totalTokens: usageSummary.totalTokens,
+      totalCost: usageSummary.totalCost,
+    });
+  }
+
+  function handleExport() {
+    setIsExporting(true);
+    try {
+      const data = exportUsageData();
+      const blob = new Blob([data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `planar-nexus-usage-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  function handleReset() {
+    if (confirm('Are you sure you want to reset all usage tracking data? This cannot be undone.')) {
+      resetAllUsage();
+      loadStats();
+    }
+  }
+
+  return (
+    <>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Total Requests</CardDescription>
+            <CardTitle className="text-3xl">{summary?.totalRequests ?? 0}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Total Tokens</CardDescription>
+            <CardTitle className="text-3xl">{summary ? formatTokens(summary.totalTokens) : '0'}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Estimated Cost</CardDescription>
+            <CardTitle className="text-3xl">{summary ? formatCost(summary.totalCost) : '$0.00'}</CardTitle>
+          </CardHeader>
+        </Card>
+      </div>
+
+      {/* Period Selection and Actions */}
+      <div className="flex flex-wrap gap-4 items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Label htmlFor="period">Time Period:</Label>
+          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+            <SelectTrigger id="period" className="w-[180px]">
+              <SelectValue placeholder="Select period" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7">Last 7 days</SelectItem>
+              <SelectItem value="30">Last 30 days</SelectItem>
+              <SelectItem value="90">Last 90 days</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={loadStats}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
+          <Button variant="outline" onClick={handleExport} disabled={isExporting}>
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+          <Button variant="destructive" onClick={handleReset}>
+            <Trash2 className="mr-2 h-4 w-4" />
+            Reset
+          </Button>
+        </div>
+      </div>
+
+      {/* Provider Stats */}
+      {stats.filter(s => s.totalRequests > 0).length === 0 ? (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            No usage data yet. Start using AI features to track your usage.
+          </CardContent>
+        </Card>
+      ) : (
+        stats.filter(s => s.totalRequests > 0).map((providerStats) => (
+          <Card key={providerStats.provider}>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-3 h-3 rounded-full ${PROVIDER_COLORS[providerStats.provider]}`} />
+                  <CardTitle>{PROVIDER_NAMES[providerStats.provider]}</CardTitle>
+                </div>
+                <Badge variant="outline">
+                  {providerStats.totalRequests} requests
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <div className="text-sm text-muted-foreground">Input Tokens</div>
+                  <div className="text-lg font-semibold">{formatTokens(providerStats.totalInputTokens)}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-muted-foreground">Output Tokens</div>
+                  <div className="text-lg font-semibold">{formatTokens(providerStats.totalOutputTokens)}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-muted-foreground">Total Tokens</div>
+                  <div className="text-lg font-semibold">{formatTokens(providerStats.totalTokens)}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-muted-foreground">Est. Cost</div>
+                  <div className="text-lg font-semibold">{formatCost(providerStats.totalCost)}</div>
+                </div>
+              </div>
+
+              {/* Daily Usage */}
+              {Object.keys(providerStats.dailyUsage).length > 0 && (
+                <div>
+                  <div className="text-sm font-medium mb-2">Daily Usage</div>
+                  <div className="space-y-2">
+                    {Object.entries(providerStats.dailyUsage)
+                      .sort(([, a], [, b]) => b.date.localeCompare(a.date))
+                      .slice(0, 7)
+                      .map(([, day]) => (
+                        <div key={day.date} className="flex items-center gap-2">
+                          <span className="text-sm w-20">{day.date}</span>
+                          <Progress value={(day.tokens / (summary?.totalTokens || 1)) * 100} className="flex-1" />
+                          <span className="text-sm text-muted-foreground w-16 text-right">
+                            {formatTokens(day.tokens)}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))
+      )}
+
+      {/* Info Note */}
+      <Alert>
+        <AlertTitle>Usage Tracking</AlertTitle>
+        <AlertDescription>
+          Usage tracking is stored locally in your browser. Cost estimates are based on approximate
+          provider pricing and may vary from actual costs. This data is not sent to any server.
+        </AlertDescription>
+      </Alert>
+    </>
+  );
+}
 
 export default function SettingsPage() {
   // State for API keys
@@ -220,6 +413,7 @@ export default function SettingsPage() {
         <TabsList>
           <TabsTrigger value="api-keys">API Keys</TabsTrigger>
           <TabsTrigger value="providers">Providers</TabsTrigger>
+          <TabsTrigger value="usage">Usage</TabsTrigger>
           <TabsTrigger value="sound">Sound</TabsTrigger>
         </TabsList>
         
@@ -451,6 +645,10 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+        
+        <TabsContent value="usage" className="space-y-6">
+          <UsageTrackingTab />
         </TabsContent>
         
         <TabsContent value="sound" className="space-y-6">
