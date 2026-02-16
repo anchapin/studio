@@ -6,6 +6,7 @@ export type GameFormat = 'commander' | 'standard' | 'modern' | 'pioneer' | 'lega
 export type PlayerCount = '2' | '3' | '4';
 export type LobbyStatus = 'waiting' | 'ready' | 'in-progress';
 export type PlayerStatus = 'not-ready' | 'ready' | 'host';
+export type GameMode = '1v1' | '2v2' | 'ffa' | 'commander-1v1' | 'commander-ffa';
 
 export interface Player {
   id: string;
@@ -29,6 +30,7 @@ export interface GameLobby {
   status: LobbyStatus;
   createdAt: number;
   settings: LobbySettings;
+  gameMode: GameMode;
 }
 
 export interface LobbySettings {
@@ -51,4 +53,5 @@ export interface HostGameConfig {
   format: GameFormat;
   maxPlayers: PlayerCount;
   settings: LobbySettings;
+  gameMode?: GameMode;
 }

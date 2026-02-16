@@ -3,10 +3,11 @@
  * Handles local lobby state for hosting games before connecting to signaling server
  */
 
-import { GameLobby, Player, HostGameConfig, LobbyStatus, PlayerStatus } from './multiplayer-types';
+import { GameLobby, Player, HostGameConfig, LobbyStatus, PlayerStatus, GameMode } from './multiplayer-types';
 import { generateGameCode, generateLobbyId, generatePlayerId } from './game-code-generator';
 import { publicLobbyBrowser } from './public-lobby-browser';
 import { validateDeckForLobby } from './format-validator';
+import { getGameModeForPlayerCount } from './game-mode';
 import type { SavedDeck } from '@/app/actions';
 
 /**
@@ -32,6 +33,12 @@ class LobbyManager {
       joinedAt: Date.now(),
     };
 
+    // Determine game mode based on player count and format
+    const gameMode = config.gameMode || getGameModeForPlayerCount(
+      parseInt(config.maxPlayers),
+      config.format
+    );
+
     const lobby: GameLobby = {
       id: lobbyId,
       gameCode,
@@ -43,6 +50,7 @@ class LobbyManager {
       status: 'waiting',
       createdAt: Date.now(),
       settings: config.settings,
+      gameMode,
     };
 
     this.currentLobby = lobby;
