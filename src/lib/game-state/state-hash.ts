@@ -33,22 +33,19 @@ function createStateSnapshot(state: GameState): StateSnapshot {
       turnNumber: state.turn.turnNumber,
       activePlayerId: state.turn.activePlayerId,
       currentPhase: state.turn.currentPhase,
-      currentStep: state.turn.currentStep,
     } : null,
     players: [],
     stack: state.stack.map(item => ({
       id: item.id,
-      sourceId: item.sourceId,
-      sourceName: item.sourceName,
       type: item.type,
     })),
     combat: state.combat ? {
       inCombatPhase: state.combat.inCombatPhase,
-      attackerIds: [...state.combat.attackers],
+      attackerIds: state.combat.attackers.map(a => a.cardId),
       blockerAssignments: Object.fromEntries(
         Array.from(state.combat.blockers.entries()).map(([attackerId, blockers]) => [
           attackerId,
-          Array.from(blockers)
+          blockers.map(b => b.cardId)
         ])
       ),
     } : null,
@@ -98,7 +95,7 @@ function serializeStateSnapshot(snapshot: StateSnapshot): string {
   parts.push(`status:${snapshot.status}`);
   
   if (snapshot.turn) {
-    parts.push(`turn:${snapshot.turn.turnNumber}:${snapshot.turn.activePlayerId}:${snapshot.turn.currentPhase}:${snapshot.turn.currentStep}`);
+    parts.push(`turn:${snapshot.turn.turnNumber}:${snapshot.turn.activePlayerId}:${snapshot.turn.currentPhase}`);
   }
   
   for (const player of snapshot.players) {
@@ -106,7 +103,7 @@ function serializeStateSnapshot(snapshot: StateSnapshot): string {
   }
   
   for (const item of snapshot.stack) {
-    parts.push(`stack:${item.id}:${item.sourceId}:${item.type}`);
+    parts.push(`stack:${item.id}:${item.type}`);
   }
   
   if (snapshot.combat) {
@@ -149,7 +146,6 @@ interface StateSnapshot {
     turnNumber: number;
     activePlayerId: PlayerId;
     currentPhase: string;
-    currentStep: string;
   } | null;
   players: Array<{
     playerId: PlayerId;
@@ -160,8 +156,6 @@ interface StateSnapshot {
   }>;
   stack: Array<{
     id: string;
-    sourceId: string;
-    sourceName: string;
     type: string;
   }>;
   combat: {
