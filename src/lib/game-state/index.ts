@@ -27,3 +27,6 @@ export * from "./state-hash";
 
 // Export replay system
 export * from "./replay";
+
+// Export serialization for save/load
+export * from "./serialization";
