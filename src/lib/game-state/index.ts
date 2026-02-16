@@ -21,3 +21,6 @@ export * from "./turn-phases";
 
 // Export main game state class and functions
 export * from "./game-state";
+
+// Export state hash verification for P2P
+export * from "./state-hash";
