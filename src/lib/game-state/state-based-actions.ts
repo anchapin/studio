@@ -14,12 +14,19 @@ import {
   isCreature,
   isPlaneswalker,
   isEnchantment,
-  isAura,
-  isEquipment,
   getToughness,
   hasLethalDamage,
 } from './card-instance';
 import { destroyCard, exileCard, moveCardToZone } from './keyword-actions';
+
+// Helper functions to check card types
+function isAura(card: CardInstance): boolean {
+  return card.cardData.type_line?.toLowerCase().includes('aura') ?? false;
+}
+
+function isEquipment(card: CardInstance): boolean {
+  return card.cardData.type_line?.toLowerCase().includes('equipment') ?? false;
+}
 
 /**
  * Result of state-based action checking
@@ -122,7 +129,7 @@ export function checkStateBasedActions(state: GameState): StateBasedActionResult
     // SBA 704.5i: A planeswalker with 0 loyalty is exiled
     if (isPlaneswalker(card)) {
       const loyaltyCounters = card.counters?.find(c => c.type === 'loyalty');
-      if (loyaltyCounters && loyaltyCounters.amount <= 0) {
+      if (loyaltyCounters && loyaltyCounters.count <= 0) {
         if (!cardsToExile.includes(card.id)) {
           cardsToExile.push(card.id);
         }
@@ -182,9 +189,16 @@ export function checkStateBasedActions(state: GameState): StateBasedActionResult
   // Check for legendary rule (SBA 704.5j)
   // Two legendary permanents with the same name - keep one, destroy the rest
   const legendaryPermanents = cardsToCheck.filter(card => {
-    const isPermanent = card.zone === 'battlefield' || 
-      (card.cardData.type_line?.toLowerCase().includes('legendary') ?? false);
-    return isPermanent;
+    // Check if card is on battlefield by looking in zones
+    let isOnBattlefield = false;
+    for (const [zoneKey, zone] of updatedState.zones) {
+      if (zoneKey.includes('battlefield') && zone.cardIds.includes(card.id)) {
+        isOnBattlefield = true;
+        break;
+      }
+    }
+    const isLegendary = card.cardData.type_line?.toLowerCase().includes('legendary') ?? false;
+    return isOnBattlefield && isLegendary;
   });
 
   const nameGroups = new Map<string, CardInstanceId[]>();
@@ -220,7 +234,7 @@ export function checkStateBasedActions(state: GameState): StateBasedActionResult
   for (const card of worldPermanents) {
     const name = card.cardData.name.toLowerCase();
     const existing = worldNameGroups.get(name) || [];
-    existing.push({ card, timestamp: card.createdAt });
+    existing.push({ card, timestamp: card.enteredBattlefieldTimestamp });
     worldNameGroups.set(name, existing);
   }
 
