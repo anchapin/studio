@@ -69,6 +69,31 @@ export function createToken(
 }
 
 /**
+ * Initialize loyalty counters on a planeswalker when it enters the battlefield
+ * Planeswalkers enter with loyalty counters equal to their loyalty field
+ * CR 306.5b
+ */
+export function initializePlaneswalkerLoyalty(card: CardInstance): CardInstance {
+  if (!isPlaneswalker(card)) {
+    return card;
+  }
+
+  // Get loyalty from card data
+  const loyaltyStr = card.cardData.loyalty;
+  if (!loyaltyStr) {
+    return card;
+  }
+
+  const loyaltyValue = parseInt(loyaltyStr, 10);
+  if (isNaN(loyaltyValue) || loyaltyValue <= 0) {
+    return card;
+  }
+
+  // Add loyalty counters
+  return addCounters(card, 'loyalty', loyaltyValue);
+}
+
+/**
  * Tap a permanent
  */
 export function tapCard(card: CardInstance): CardInstance {

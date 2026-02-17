@@ -797,7 +797,7 @@ export function dealDamageToCard(
     isCombatDamage,
     damageTypes: (isCombatDamage ? ['combat'] : ['noncombat']) as ('combat' | 'noncombat')[],
   };
-  
+
   const processedEvent = replacementEffectManager.processEvent(replacementEvent);
   const actualDamage = processedEvent.amount;
 
@@ -807,18 +807,24 @@ export function dealDamageToCard(
     damage: card.damage + actualDamage,
   };
 
-  // Check for deathtouch - lethal damage is 1 or more
-  const oracleText = card.cardData.oracle_text?.toLowerCase() || '';
-  const keywords = card.cardData.keywords || [];
-  const hasDeathtouch = keywords.includes('Deathtouch') || oracleText.includes('deathtouch');
-  
-  if (hasDeathtouch && actualDamage > 0) {
-    // With deathtouch, any amount of damage is lethal
-    const lethalDamage = getToughness(card);
-    updatedCard = {
-      ...updatedCard,
-      damage: Math.max(updatedCard.damage, lethalDamage),
-    };
+  // Check for deathtouch on the source - lethal damage is 1 or more
+  // CR 702.2b: Any nonzero amount of combat damage assigned by a source with deathtouch is considered lethal damage
+  if (sourceId) {
+    const sourceCard = state.cards.get(sourceId);
+    if (sourceCard) {
+      const sourceOracleText = sourceCard.cardData.oracle_text?.toLowerCase() || '';
+      const sourceKeywords = sourceCard.cardData.keywords || [];
+      const sourceHasDeathtouch = sourceKeywords.includes('Deathtouch') || sourceOracleText.includes('deathtouch');
+
+      if (sourceHasDeathtouch && actualDamage > 0) {
+        // With deathtouch, any amount of damage is lethal
+        const lethalDamage = getToughness(card);
+        updatedCard = {
+          ...updatedCard,
+          damage: Math.max(updatedCard.damage, lethalDamage),
+        };
+      }
+    }
   }
 
   const updatedCards = new Map(state.cards);

@@ -2,6 +2,8 @@
  * State-Based Actions System
  * Implements MTG state-based actions (SBAs) as defined in Comprehensive Rules 704.
  * SBAs are checked continuously and performed automatically.
+ * 
+ * Issue #267: State-based actions (SBA) system for the MTG rules engine
  */
 
 import type {
@@ -18,6 +20,7 @@ import {
   hasLethalDamage,
 } from './card-instance';
 import { destroyCard, exileCard, moveCardToZone } from './keyword-actions';
+import { isCommander, DEFAULT_COMMANDER_DAMAGE_THRESHOLD } from './commander-damage';
 
 // Helper functions to check card types
 function isAura(card: CardInstance): boolean {
@@ -88,6 +91,26 @@ export function checkStateBasedActions(state: GameState): StateBasedActionResult
       // Player will lose on their next draw attempt
       // This is handled in the draw function
     }
+
+    // Commander damage (CR 903.10a): A player who has been dealt 21 or more
+    // combat damage by the same commander over the course of the game loses the game
+    for (const [commanderId, damage] of player.commanderDamage) {
+      if (damage >= DEFAULT_COMMANDER_DAMAGE_THRESHOLD) {
+        const commander = updatedState.cards.get(commanderId);
+        const commanderName = commander?.cardData.name || 'Commander';
+        updatedState = {
+          ...updatedState,
+          players: new Map(updatedState.players).set(playerId, {
+            ...player,
+            hasLost: true,
+            lossReason: `${commanderName} has dealt ${damage} commander damage (21+)`,
+          }),
+        };
+        descriptions.push(`${player.name} loses the game (${commanderName} dealt ${damage} commander damage)`);
+        actionsPerformed = true;
+        break; // Only need to mark once per player
+      }
+    }
   }
 
   // Check cards for SBAs
@@ -129,9 +152,11 @@ export function checkStateBasedActions(state: GameState): StateBasedActionResult
     }
 
     // SBA 704.5i: A planeswalker with 0 loyalty is exiled
+    // Planeswalkers enter with loyalty counters equal to their loyalty field (CR 306.5b)
     if (isPlaneswalker(card)) {
       const loyaltyCounters = card.counters?.find(c => c.type === 'loyalty');
-      if (loyaltyCounters && loyaltyCounters.count <= 0) {
+      const loyalty = loyaltyCounters?.count ?? 0;
+      if (loyalty <= 0) {
         if (!cardsToExile.includes(card.id)) {
           cardsToExile.push(card.id);
         }
@@ -163,7 +188,8 @@ export function checkStateBasedActions(state: GameState): StateBasedActionResult
       }
     }
 
-    // SBA 704.5n: An Equipment or Fortification attached to a non-permanent is put in the graveyard
+    // SBA 704.5n: An Equipment or Fortification attached to an illegal object is put in the graveyard
+    // Equipment can only be attached to a creature on the battlefield
     if (isEquipment(card) && card.attachedToId) {
       const attachedTo = updatedState.cards.get(card.attachedToId);
       // Check if the attached object is on the battlefield
@@ -176,12 +202,14 @@ export function checkStateBasedActions(state: GameState): StateBasedActionResult
           }
         }
       }
-      // Equipment can only attach to creatures - if target is not a creature or not on battlefield, it's illegal
-      if (attachedTo && attachedToOnBattlefield && !isCreature(attachedTo)) {
+      // Equipment becomes unattached if the attached permanent leaves the battlefield
+      // or if it's attached to a non-creature permanent
+      if (!attachedToOnBattlefield || (attachedTo && !isCreature(attachedTo))) {
         if (!cardsToDestroy.includes(card.id)) {
           cardsToDestroy.push(card.id);
         }
-        descriptions.push(`${card.cardData.name} is destroyed (attached to non-creature)`);
+        const reason = !attachedToOnBattlefield ? 'attached permanent left battlefield' : 'attached to non-creature';
+        descriptions.push(`${card.cardData.name} is destroyed (${reason})`);
         actionsPerformed = true;
       }
     }
@@ -276,14 +304,25 @@ export function checkStateBasedActions(state: GameState): StateBasedActionResult
 
   // Check for planeswalker uniqueness (SBA 704.5j variant)
   // A player can only control one planeswalker of each type
-  const planeswalkers = cardsToCheck.filter(card => isPlaneswalker(card));
+  // Only check planeswalkers on the battlefield
+  const planeswalkers = cardsToCheck.filter(card => {
+    // Check if card is on battlefield by looking in zones
+    let isOnBattlefield = false;
+    for (const [zoneKey, zone] of updatedState.zones) {
+      if (zoneKey.includes('battlefield') && zone.cardIds.includes(card.id)) {
+        isOnBattlefield = true;
+        break;
+      }
+    }
+    return isOnBattlefield && isPlaneswalker(card);
+  });
   const pwTypeGroups = new Map<string, CardInstanceId[]>();
-  
+
   for (const pw of planeswalkers) {
     // Extract planeswalker type from type line (e.g., "Jace" from "Legendary Planeswalker - Jace")
     const typeLine = pw.cardData.type_line || '';
     // Handle both em dash and regular hyphen
-    const pwType = typeLine.replace(/Legendary Planeswalker [-—] /, '').trim();
+    const pwType = typeLine.replace(/Legendary Planeswalker [-—] /i, '').trim();
 
     const existing = pwTypeGroups.get(pwType) || [];
     existing.push(pw.id);
