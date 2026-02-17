@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/dialog";
 import { PlayerState, PlayerCount, ZoneType } from "@/types/game";
 import { HandDisplay } from "@/components/hand-display";
-import { StackDisplay, PriorityInfo, StackItem } from "@/components/stack-display";
 import {
   Skull,
   Archive,
@@ -34,11 +33,7 @@ import {
   Crown,
   Flag,
   Handshake,
-  X,
-  Plus,
-  Minus,
-  Zap,
-  Star
+  X
 } from "lucide-react";
 
 // Performance optimization constants
@@ -74,17 +69,6 @@ interface GameBoardProps {
   hasActiveDrawOffer?: boolean;
   hasPlayerOfferedDraw?: boolean;
   isGameOver?: boolean;
-  // Stack and priority (Issue #22)
-  stack?: StackItem[];
-  priorityPlayerId?: string;
-  onStackItemClick?: (itemId: string) => void;
-  // Life and counter adjustments (Issue #23)
-  onLifeAdjust?: (playerId: string, amount: number) => void;
-  onPoisonAdjust?: (playerId: string, amount: number) => void;
-  onExperienceAdjust?: (playerId: string, amount: number) => void;
-  onEnergyAdjust?: (playerId: string, amount: number) => void;
-  // Whether to show interactive controls (for local player)
-  showPlayerControls?: boolean;
 }
 
 interface PlayerAreaProps {
@@ -220,48 +204,40 @@ interface PlayerInfoProps {
   player: PlayerState;
   isCurrentTurn: boolean;
   isVertical: boolean;
+  otherPlayers?: PlayerState[];
   onLifeAdjust?: (playerId: string, amount: number) => void;
   onPoisonAdjust?: (playerId: string, amount: number) => void;
-  onExperienceAdjust?: (playerId: string, amount: number) => void;
-  onEnergyAdjust?: (playerId: string, amount: number) => void;
+  onCommanderDamageAdjust?: (playerId: string, targetPlayerId: string, amount: number) => void;
   showControls?: boolean;
 }
 
 const PlayerInfo = memo(function PlayerInfo({
   player,
-  isCurrentTurn,
   isVertical,
+  otherPlayers = [],
   onLifeAdjust,
   onPoisonAdjust,
-  onExperienceAdjust,
-  onEnergyAdjust,
+  onCommanderDamageAdjust,
   showControls = false
 }: PlayerInfoProps) {
-  // Issue #23: Experience and energy counters (stored in card state counters)
-  const experienceCounters = React.useMemo(() => {
-    return player.battlefield.filter(c => c.card.type_line?.includes("Planeswalker")).length > 0 
-      ? player.battlefield.reduce((sum, c) => sum + (c.counters || 0), 0)
-      : 0;
-  }, [player.battlefield]);
+  // Issue #24: Enhanced commander damage display - per opponent tracking
+  const commanderDamageEntries = React.useMemo(() => {
+    if (!player.commanderDamage) return [];
+    return Object.entries(player.commanderDamage);
+  }, [player.commanderDamage]);
 
-  const energyCounters = React.useMemo(() => {
-    return 0; // Would need to track this in player state
-  }, []);
+  // Get player names for commander damage targets
+  const getPlayerName = (playerId: string) => {
+    const targetPlayer = otherPlayers.find(p => p.id === playerId);
+    return targetPlayer?.name || 'Unknown';
+  };
 
-  const handleLifeIncrease = () => onLifeAdjust?.(player.id, 1);
-  const handleLifeDecrease = () => onLifeAdjust?.(player.id, -1);
-  const handlePoisonIncrease = () => onPoisonAdjust?.(player.id, 1);
-  const handlePoisonDecrease = () => onPoisonAdjust?.(player.id, -1);
+  // Check if any commander damage is fatal (21+ damage)
+  const hasFatalCommanderDamage = commanderDamageEntries.some(([, damage]) => damage >= 21);
 
   return (
     <div className={`flex items-center gap-2 ${isVertical ? "flex-col" : ""}`}>
       <div className="flex items-center gap-2">
-        {isCurrentTurn && (
-          <Badge variant="default" className="animate-pulse">
-            <Crown className="h-3 w-3 mr-1" />
-            Active
-          </Badge>
-        )}
         <div className="flex items-center gap-1 text-sm">
           <User className="h-4 w-4" />
           <span className="font-medium">{player.name}</span>
@@ -269,94 +245,72 @@ const PlayerInfo = memo(function PlayerInfo({
       </div>
       <Separator orientation={isVertical ? "horizontal" : "vertical"} className="h-6" />
       <div className="flex items-center gap-3 flex-wrap justify-center">
-        {/* Life Total - Issue #23 */}
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger>
               <div className="flex items-center gap-1 text-sm">
-                <Heart className="h-4 w-4 text-red-500" />
-                <span className="font-mono font-bold">{player.lifeTotal}</span>
+                <Heart className={`h-4 w-4 ${hasFatalCommanderDamage ? 'text-red-600 animate-pulse' : 'text-red-500'}`} />
+                <span className={`font-mono font-bold ${hasFatalCommanderDamage ? 'text-red-600' : ''}`}>
+                  {player.lifeTotal}
+                </span>
               </div>
             </TooltipTrigger>
             <TooltipContent>Life Total</TooltipContent>
           </Tooltip>
         </TooltipProvider>
         
-        {/* Life Adjustment Controls - Issue #23 */}
-        {showControls && onLifeAdjust && (
-          <div className="flex items-center gap-0.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0"
-              onClick={handleLifeDecrease}
-            >
-              <Minus className="h-3 w-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0"
-              onClick={handleLifeIncrease}
-            >
-              <Plus className="h-3 w-3" />
-            </Button>
-          </div>
+        {player.poisonCounters >= 10 && (
+          <Badge variant="destructive" className="text-xs">
+            <PoisonIcon className="h-3 w-3 mr-1" />
+            {player.poisonCounters} Poison
+          </Badge>
         )}
-
-        {/* Poison Counters - Issue #23 */}
-        {(player.poisonCounters > 0 || showControls) && (
+        
+        {/* Issue #24: Commander damage per opponent display */}
+        {commanderDamageEntries.length > 0 && (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger>
-                <div className="flex items-center gap-1 text-sm">
-                  <PoisonIcon className="h-4 w-4 text-purple-500" />
-                  <span className="font-mono font-bold">{player.poisonCounters}</span>
+                <div className="flex items-center gap-1 flex-wrap justify-center">
+                  {commanderDamageEntries.map(([targetId, damage]) => (
+                    <Badge 
+                      key={targetId} 
+                      variant={damage >= 21 ? "destructive" : "outline"} 
+                      className="text-xs"
+                    >
+                      {getPlayerName(targetId)}: {damage}
+                    </Badge>
+                  ))}
                 </div>
               </TooltipTrigger>
-              <TooltipContent>Poison Counters</TooltipContent>
+              <TooltipContent>
+                <div className="text-xs">
+                  <p className="font-bold mb-1">Commander Damage</p>
+                  {commanderDamageEntries.map(([targetId, damage]) => (
+                    <p key={targetId}>
+                      {getPlayerName(targetId)}: {damage}/21
+                      {damage >= 21 && " (DEFEATED)"}
+                    </p>
+                  ))}
+                </div>
+              </TooltipContent>
             </Tooltip>
           </TooltipProvider>
-        )}
-
-        {/* Poison Adjustment Controls - Issue #23 */}
-        {showControls && onPoisonAdjust && (
-          <div className="flex items-center gap-0.5">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0"
-              onClick={handlePoisonDecrease}
-              disabled={player.poisonCounters <= 0}
-            >
-              <Minus className="h-3 w-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 w-6 p-0"
-              onClick={handlePoisonIncrease}
-            >
-              <Plus className="h-3 w-3" />
-            </Button>
-          </div>
-        )}
-
-        {/* Commander Damage - Issue #24 */}
-        {player.commanderDamage && Object.keys(player.commanderDamage).length > 0 && (
-          <Badge variant="outline" className="text-xs">
-            CMDR: {Object.values(player.commanderDamage)[0]}
-          </Badge>
         )}
       </div>
     </div>
   );
 });
 
-function PlayerArea({ player, isCurrentTurn, position, onCardClick, onZoneClick, orientation = "horizontal", isLocalPlayer = false }: PlayerAreaProps) {
+function PlayerArea({ player, isCurrentTurn, position, onCardClick, onZoneClick, orientation = "horizontal", isLocalPlayer = false, allPlayers = [] }: PlayerAreaProps & { allPlayers?: PlayerState[] }) {
   const isBottom = position === "bottom";
   const isVertical = orientation === "vertical";
   const [selectedHandCards, setSelectedHandCards] = React.useState<string[]>([]);
+
+  // Get other players for commander damage display (Issue #24)
+  const otherPlayers = React.useMemo(() => {
+    return allPlayers.filter(p => p.id !== player.id);
+  }, [allPlayers, player.id]);
 
   // Memoize handlers to prevent unnecessary re-renders
   const handleZoneClick = useCallback((zone: ZoneType) => {
@@ -552,31 +506,11 @@ export function GameBoard({
   hasActiveDrawOffer = false,
   hasPlayerOfferedDraw = false,
   isGameOver = false,
-  // Stack and priority props (Issue #22)
-  stack = [],
-  priorityPlayerId,
-  onStackItemClick,
-  // Life and counter adjustments (Issue #23)
-  onLifeAdjust,
-  onPoisonAdjust,
-  onExperienceAdjust,
-  onEnergyAdjust,
-  showPlayerControls = false,
 }: GameBoardProps) {
   const currentPlayer = players[currentTurnIndex];
   
   // Dialog states
   const [showConcedeDialog, setShowConcedeDialog] = React.useState(false);
-  const [stackExpanded, setStackExpanded] = React.useState(false);
-
-  // Build priority info for StackDisplay
-  const priorityPlayers: PriorityInfo[] = React.useMemo(() => {
-    return players.map(player => ({
-      playerId: player.id,
-      playerName: player.name,
-      hasPriority: player.id === priorityPlayerId,
-    }));
-  }, [players, priorityPlayerId]);
 
   // Layout strategy based on player count
   const renderLayout = () => {
@@ -596,27 +530,16 @@ export function GameBoard({
                 onZoneClick={onZoneClick}
                 orientation="horizontal"
                 isLocalPlayer={false}
+                allPlayers={players}
               />
             </CardContent>
           </Card>
 
-          {/* Stack and turn info center area */}
-          <div className="flex flex-col items-center gap-2">
+          <div className="flex items-center justify-center">
             <Badge variant="outline" className="px-4 py-2 text-lg">
               <Swords className="h-4 w-4 mr-2" />
-              {currentPlayer?.name}'s Turn
+              Turn {currentPlayer?.name}
             </Badge>
-            {/* Stack Display - Issue #22 */}
-            <div className="w-full max-w-md">
-              <StackDisplay
-                stack={stack}
-                players={priorityPlayers}
-                priorityPlayerId={priorityPlayerId}
-                expanded={stackExpanded}
-                onStackItemClick={onStackItemClick}
-                onToggleExpand={() => setStackExpanded(!stackExpanded)}
-              />
-            </div>
           </div>
 
           <Card className="border-2 border-primary/20">
@@ -629,6 +552,7 @@ export function GameBoard({
                 onZoneClick={onZoneClick}
                 orientation="horizontal"
                 isLocalPlayer={true}
+                allPlayers={players}
               />
             </CardContent>
           </Card>
@@ -654,6 +578,7 @@ export function GameBoard({
                 onZoneClick={onZoneClick}
                 orientation="horizontal"
                 isLocalPlayer={false}
+                allPlayers={players}
               />
             </CardContent>
           </Card>
@@ -668,28 +593,21 @@ export function GameBoard({
                 onZoneClick={onZoneClick}
                 orientation="vertical"
                 isLocalPlayer={false}
+                allPlayers={players}
               />
             </CardContent>
           </Card>
 
           <Card className="row-start-2 row-span-1 col-start-2 col-span-1 border-border/30 bg-muted/30">
-            <CardContent className="p-4 h-full flex flex-col items-center justify-center gap-2">
+            <CardContent className="p-4 h-full flex items-center justify-center">
               <div className="text-center space-y-2">
                 <Badge variant="outline" className="px-4 py-2 text-sm">
                   <Swords className="h-3 w-3 mr-2" />
                   {currentPlayer?.name}'s Turn
                 </Badge>
-              </div>
-              {/* Stack Display - Issue #22 */}
-              <div className="w-full max-w-[200px]">
-                <StackDisplay
-                  stack={stack}
-                  players={priorityPlayers}
-                  priorityPlayerId={priorityPlayerId}
-                  expanded={stackExpanded}
-                  onStackItemClick={onStackItemClick}
-                  onToggleExpand={() => setStackExpanded(!stackExpanded)}
-                />
+                <div className="text-xs text-muted-foreground">
+                  Stack: 0 items
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -704,6 +622,7 @@ export function GameBoard({
                 onZoneClick={onZoneClick}
                 orientation="vertical"
                 isLocalPlayer={false}
+                allPlayers={players}
               />
             </CardContent>
           </Card>
@@ -718,6 +637,7 @@ export function GameBoard({
                 onZoneClick={onZoneClick}
                 orientation="horizontal"
                 isLocalPlayer={true}
+                allPlayers={players}
               />
             </CardContent>
           </Card>
