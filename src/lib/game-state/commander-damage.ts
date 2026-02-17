@@ -387,7 +387,7 @@ export function getCommanderDamageSummary(
   
   for (const [playerId, player] of state.players) {
     const commanders: CommanderDamageSummary['commanders'] = [];
-    const totalDamageDealt = 0;
+    let totalDamageDealt = 0;
     
     for (const [commanderId, damage] of player.commanderDamage) {
       const commander = state.cards.get(commanderId);

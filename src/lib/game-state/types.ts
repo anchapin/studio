@@ -5,6 +5,9 @@
 
 import { ScryfallCard } from "@/app/actions";
 
+// Re-export ScryfallCard for use in other game-state modules
+export type { ScryfallCard } from "@/app/actions";
+
 /**
  * Unique identifier for a card instance in the game
  */
