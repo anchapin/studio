@@ -542,10 +542,14 @@ export function parseActivatedAbilities(oracleText: string, typeLine: string): P
     }
     
     abilities.push({
+
       type: AbilityType.ACTIVATED,
       costs,
       effect: effectPart,
-      ...effect,
+      effectType: effect.effectType as ParsedActivatedAbility["effectType"],
+      targets: effect.targets,
+      value: effect.value,
+
     });
   }
   
@@ -662,7 +666,8 @@ function parseEffect(effectString: string): { effectType: string; targets: Parse
   }
   
   if (effect.includes("tap ") || effect.includes("untap ")) {
-    return { effectType: (effect.includes("tap ") ? "tap" : "untap") as const, targets, value };
+    const tapEffectType = effect.includes("tap ") ? "tap" : "untap";
+    return { effectType: tapEffectType as "tap" | "untap", targets, value };
   }
   
   if (effect.includes("+1/+1") || effect.includes("-1/-1")) {
@@ -724,6 +729,7 @@ export function parseTriggeredAbilities(oracleText: string): ParsedTriggeredAbil
       if (trigger) {
         const effect = parseEffect(effectText);
         abilities.push({
+
           type: AbilityType.TRIGGERED,
           trigger,
           effect: effectText,
@@ -739,6 +745,7 @@ export function parseTriggeredAbilities(oracleText: string): ParsedTriggeredAbil
       if (trigger) {
         const effect = parseEffect(effectText);
         abilities.push({
+
           type: AbilityType.TRIGGERED,
           trigger,
           effect: effectText,
@@ -857,6 +864,7 @@ export function parseStaticAbilities(oracleText: string, typeLine: string): Pars
   for (const keyword of keywordStatics) {
     if (combinedText.includes(keyword)) {
       abilities.push({
+
         type: AbilityType.STATIC,
         ability: "keyword",
         keywordType: keyword,
@@ -879,6 +887,7 @@ export function parseStaticAbilities(oracleText: string, typeLine: string): Pars
     let match;
     while ((match = pattern.exec(combinedText)) !== null) {
       abilities.push({
+
         type: AbilityType.STATIC,
         ability: "staticEffect",
         effect: match[0],

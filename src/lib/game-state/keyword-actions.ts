@@ -106,6 +106,7 @@ export function destroyCard(
   // Check for replacement effects (e.g., "If a creature would be destroyed, exile it instead")
   const replacementEvent = {
     type: 'destroy' as const,
+    amount: 0,
     timestamp: Date.now(),
     targetId: cardId,
   };
@@ -794,7 +795,7 @@ export function dealDamageToCard(
     targetId: cardId,
     amount: damage,
     isCombatDamage,
-    damageTypes: isCombatDamage ? ['combat'] : ['noncombat'],
+    damageTypes: (isCombatDamage ? ['combat'] : ['noncombat']) as ('combat' | 'noncombat')[],
   };
   
   const replacementResult = replacementEffectManager.processEvent(replacementEvent);
