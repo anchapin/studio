@@ -132,6 +132,7 @@ const ZoneDisplay = memo(function ZoneDisplay({
     exile: <Ban className="h-3 w-3" />,
     library: <Library className="h-3 w-3" />,
     command: <Crown className="h-3 w-3" />,
+    companion: <Crown className="h-3 w-3" />,
   }), []);
 
   return (
@@ -274,6 +275,7 @@ function PlayerArea({ player, isCurrentTurn, position, onCardClick, onZoneClick,
     exile: <Ban className="h-3 w-3" />,
     library: <Library className="h-3 w-3" />,
     command: <Crown className="h-3 w-3" />,
+    companion: <Crown className="h-3 w-3" />,
   }), []);
 
   // Local ZoneDisplay wrapper for backward compatibility
