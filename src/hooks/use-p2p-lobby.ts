@@ -130,7 +130,7 @@ export function useP2PLobby() {
     setError(null);
     
     try {
-      const gameCode = generateGameCode(6);
+      const gameCode = generateGameCode();
       const hostName = localStorage.getItem('planar_nexus_player_name') || 'Host';
       
       const newLobby = lobbyManager.createLobby(config, hostName);

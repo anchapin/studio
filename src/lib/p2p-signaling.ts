@@ -70,13 +70,12 @@ export class P2PSignalingService {
     
     return new Promise((resolve, reject) => {
       // Use game code as peer ID for hosts (easier to connect)
-      const peerId = this.isHost && hostGameCode 
-        ? `planar-nexus-${hostGameCode}` 
-        : undefined;
-
-      this.peer = new Peer(peerId, {
-        debug: 1,
-      });
+      if (this.isHost && hostGameCode) {
+        const peerId = `planar-nexus-${hostGameCode}`;
+        this.peer = new Peer(peerId, { debug: 1 });
+      } else {
+        this.peer = new Peer({ debug: 1 });
+      }
 
       this.peer.on('open', (id) => {
         console.log('[P2P] Peer connected with ID:', id);
@@ -132,7 +131,7 @@ export class P2PSignalingService {
       throw new Error('Peer not initialized');
     }
 
-    const hostPeerId = `planar-nexus-${gameCode}`;
+      const hostPeerId = `planar-nexus-${gameCode}` as const;
     console.log('[P2P] Connecting to host:', hostPeerId);
 
     return new Promise((resolve, reject) => {
