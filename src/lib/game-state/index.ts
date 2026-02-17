@@ -133,3 +133,9 @@ export * from "./state-based-actions";
 
 // Export Oracle text parser (CR 112, 113, 608)
 export * from "./oracle-text-parser";
+
+// Export mana system (CR 106 - Mana, CR 305 - Lands)
+export * from "./mana";
+
+// Export spell casting system (CR 601 - Casting Spells)
+export * from "./spell-casting";
