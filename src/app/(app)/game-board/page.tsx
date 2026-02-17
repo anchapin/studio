@@ -99,7 +99,7 @@ function generateMockPlayer(
               name: "Commander",
               color_identity: [],
             },
-            zone: "command" as ZoneType,
+            zone: "commandZone" as ZoneType,
             playerId: id,
           },
         ]
@@ -189,7 +189,35 @@ export default function GameBoardPage() {
 
   const handleZoneClick = (zone: ZoneType, playerId: string) => {
     const player = players.find((p) => p.id === playerId);
-    const zoneData = player?.[zone === "command" ? "commandZone" : zone];
+    let zoneData: any[] = [];
+    
+    // Map ZoneType to PlayerState properties
+    switch (zone) {
+      case "commandZone":
+        zoneData = player?.commandZone || [];
+        break;
+      case "battlefield":
+        zoneData = player?.battlefield || [];
+        break;
+      case "hand":
+        zoneData = player?.hand || [];
+        break;
+      case "graveyard":
+        zoneData = player?.graveyard || [];
+        break;
+      case "exile":
+        zoneData = player?.exile || [];
+        break;
+      case "library":
+        zoneData = player?.library || [];
+        break;
+      case "stack":
+      case "sideboard":
+      case "anticipate":
+        // These zones don't exist in PlayerState yet
+        zoneData = [];
+        break;
+    }
 
     toast({
       title: `${zone.charAt(0).toUpperCase() + zone.slice(1)} Zone`,

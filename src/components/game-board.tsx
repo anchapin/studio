@@ -47,8 +47,11 @@ const ZONE_ICONS: Record<ZoneType, React.ReactNode> = {
   graveyard: <Skull className="h-3 w-3" />,
   exile: <Ban className="h-3 w-3" />,
   library: <Library className="h-3 w-3" />,
-  command: <Crown className="h-3 w-3" />,
+  commandZone: <Crown className="h-3 w-3" />,
   companion: <Crown className="h-3 w-3" />,
+  stack: null,
+  sideboard: null,
+  anticipate: null,
 };
 
 interface GameBoardProps {
@@ -131,8 +134,11 @@ const ZoneDisplay = memo(function ZoneDisplay({
     graveyard: <Skull className="h-3 w-3" />,
     exile: <Ban className="h-3 w-3" />,
     library: <Library className="h-3 w-3" />,
-    command: <Crown className="h-3 w-3" />,
+    commandZone: <Crown className="h-3 w-3" />,
     companion: <Crown className="h-3 w-3" />,
+    stack: null,
+    sideboard: null,
+    anticipate: null,
   }), []);
 
   return (
@@ -282,8 +288,11 @@ function PlayerArea({ player, isCurrentTurn, position, onCardClick, onZoneClick,
     graveyard: <Skull className="h-3 w-3" />,
     exile: <Ban className="h-3 w-3" />,
     library: <Library className="h-3 w-3" />,
-    command: <Crown className="h-3 w-3" />,
+    commandZone: <Crown className="h-3 w-3" />,
     companion: <Crown className="h-3 w-3" />,
+    stack: null,
+    sideboard: null,
+    anticipate: null,
   }), []);
 
   // Local ZoneDisplay wrapper for backward compatibility
@@ -322,7 +331,7 @@ function PlayerArea({ player, isCurrentTurn, position, onCardClick, onZoneClick,
       {/* Command Zone - always visible for Commander format */}
       {player.commandZone.length > 0 && (
         <ZoneDisplayLocal
-          zone="command"
+          zone="commandZone"
           title="Command Zone"
           count={player.commandZone.length}
           cards={player.commandZone}
