@@ -1,10 +1,12 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  // Enable static export for Tauri/PWA compatibility
-  output: 'export',
+  // Note: Removed 'output: export' because Server Actions are not compatible
+  // with static exports. The app uses a custom service worker (public/sw.js)
+  // for PWA/offline functionality instead.
+  // Using default Next.js output mode (dynamic) to support Server Actions.
   
-  // Configure image optimization for static export
+  // Configure image optimization
   images: {
     unoptimized: true,
     remotePatterns: [
@@ -52,17 +54,8 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   
-  // Disable SSR features not compatible with static export
-  // Note: The following features are not compatible with output: 'export':
-  // - API routes
-  // - rewrites to dynamic routes
-  // - redirects (unless using static external URLs)
-  
   // Set base path for deployment
   basePath: '',
-  
-  // Generate static HTML files
-  // This is required for proper SPA behavior
 };
 
 export default nextConfig;

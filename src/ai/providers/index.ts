@@ -9,9 +9,9 @@
  * The AI functionality should only be used server-side or with proper fallback handling.
  */
 
-// Re-export Claude and OpenAI providers
-export * from './claude';
-export * from './openai';
+// Note: We don't re-export Claude and OpenAI providers here because they import
+// the actual SDKs which causes issues during SSR/prerendering.
+// Import directly from './claude' or './openai' when needed in server contexts.
 
 /**
  * Supported AI providers
