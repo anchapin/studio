@@ -139,3 +139,5 @@ export * from "./mana";
 
 // Export spell casting system (CR 601 - Casting Spells)
 export * from "./spell-casting";
+
+export * from "./abilities"
