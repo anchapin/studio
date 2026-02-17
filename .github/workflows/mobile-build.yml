@@ -28,9 +28,25 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Determine build type: 'release' for release events, otherwise from workflow_dispatch input
+  setup-build:
+    name: Setup Build
+    runs-on: ubuntu-latest
+    outputs:
+      build_type: ${{ steps.set_build_type.outputs.build_type }}
+    steps:
+      - id: set_build_type
+        run: |
+          if [ "${{ github.event_name }}" == "release" ]; then
+            echo "build_type=release" >> $GITHUB_OUTPUT
+          else
+            echo "build_type=${{ github.inputs.build_type }}" >> $GITHUB_OUTPUT
+          fi
+
   build-ios:
     name: Build iOS
     runs-on: macos-latest
+    needs: setup-build
     if: github.event_name == 'release' || github.inputs.platform == 'all' || github.inputs.platform == 'ios'
     steps:
       - name: Checkout
@@ -61,7 +77,7 @@ jobs:
           brew install cocoapods
 
       - name: Setup Code Signing
-        if: github.inputs.build_type == 'release'
+        if: needs.setup-build.outputs.build_type == 'release'
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -70,7 +86,6 @@ jobs:
         run: |
           # Create keychain
           echo -n "$APPLE_CERTIFICATE" | base64 --decode -o certificate.p12
-          keychain password set --password $KEYCHAIN_PASSWORD 2>/dev/null || true
           security create-keychain -p $KEYCHAIN_PASSWORD build.keychain
           security unlock-keychain -p $KEYCHAIN_PASSWORD build.keychain
           security import certificate.p12 -P $APPLE_CERTIFICATE_PASSWORD -A -t cert -f pkcs12 -k build.keychain
@@ -78,7 +93,7 @@ jobs:
 
       - name: Build iOS App
         run: |
-          if [ "${{ github.inputs.build_type }}" == "release" ]; then
+          if [ "${{ needs.setup-build.outputs.build_type }}" == "release" ]; then
             tauri build --target aarch64-apple-ios --bundles ios
           else
             tauri build --target aarch64-apple-ios --debug --bundles ios
@@ -87,23 +102,22 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
 
+      - name: Cleanup certificates
+        if: needs.setup-build.outputs.build_type == 'release'
+        run: |
+          rm -f certificate.p12
+          security delete-keychain build.keychain || true
+
       - name: Upload iOS artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ios-app-debug
+          name: ios-app-${{ needs.setup-build.outputs.build_type }}
           path: src-tauri/target/*/bundle/ios/*.ipa
-        if: github.inputs.build_type != 'release'
-
-      - name: Upload iOS Release artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-app-release
-          path: src-tauri/target/*/bundle/ios/*.ipa
-        if: github.inputs.build_type == 'release'
 
   build-android:
     name: Build Android
     runs-on: ubuntu-22.04
+    needs: setup-build
     if: github.event_name == 'release' || github.inputs.platform == 'all' || github.inputs.platform == 'android'
     steps:
       - name: Checkout
@@ -140,10 +154,12 @@ jobs:
 
       - name: Build Android App
         run: |
-          if [ "${{ github.inputs.build_type }}" == "release" ]; then
+          if [ "${{ needs.setup-build.outputs.build_type }}" == "release" ]; then
             # For release builds, use the signing config from secrets
             echo "${{ secrets.ANDROID_KEYSTORE }}" | base64 --decode -o android.keystore
             tauri build --target aarch64-linux-android --bundles apk,aab
+            # Clean up keystore after build
+            rm -f android.keystore
           else
             tauri build --target aarch64-linux-android --debug --bundles apk
           fi
@@ -153,21 +169,20 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
-      - name: Upload Android Debug APK
+      - name: Upload Android artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk-debug
-          path: src-tauri/target/*/bundle/android/*.apk
-        if: github.inputs.build_type != 'release'
-
-      - name: Upload Android Release artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-release
+          name: android-apk-${{ needs.setup-build.outputs.build_type }}
           path: |
             src-tauri/target/*/bundle/android/*.apk
+
+      - name: Upload Android Release AAB
+        if: needs.setup-build.outputs.build_type == 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-aab-release
+          path: |
             src-tauri/target/*/bundle/android/*.aab
-        if: github.inputs.build_type == 'release'
 
   release-mobile:
     name: Create Mobile Release
@@ -188,8 +203,8 @@ jobs:
         with:
           files: |
             artifacts/ios-app-release/*.ipa
-            artifacts/android-release/*.apk
-            artifacts/android-release/*.aab
+            artifacts/android-apk-release/*.apk
+            artifacts/android-aab-release/*.aab
           draft: false
           prerelease: false
         env:
