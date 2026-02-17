@@ -9,6 +9,10 @@
  * The AI functionality should only be used server-side or with proper fallback handling.
  */
 
+// Re-export Claude and OpenAI providers
+export * from './claude';
+export * from './openai';
+
 /**
  * Supported AI providers
  */
@@ -94,29 +98,69 @@ export function getAvailableProviders(): AIProvider[] {
 }
 
 /**
+ * Google model options (static list)
+ */
+const GOOGLE_MODELS = [
+  'gemini-1.5-flash-latest',
+  'gemini-1.5-flash-8b',
+  'gemini-1.5-pro-latest',
+  'gemini-2.0-flash-exp',
+];
+
+/**
  * Get model options for a specific provider
  */
 export function getModelOptions(provider: AIProvider): string[] {
-  const models: Record<AIProvider, string[]> = {
-    google: [
-      'gemini-1.5-flash-latest',
-      'gemini-1.5-flash-8b',
-      'gemini-1.5-pro-latest',
-      'gemini-2.0-flash-exp',
-    ],
-    openai: [
-      'gpt-4o-mini',
-      'gpt-4o',
-      'gpt-4-turbo',
-    ],
-    anthropic: [
-      'claude-3-haiku-20240307',
-      'claude-3-sonnet-20240229',
-      'claude-3-opus-20240229',
-    ],
-    custom: [DEFAULT_MODELS.google],
-  };
-  return models[provider] || [];
+  switch (provider) {
+    case 'google':
+      return GOOGLE_MODELS;
+    case 'openai':
+      // Lazy import to avoid bundling issues in browser
+      return getOpenAIModelOptionsStatic();
+    case 'anthropic':
+      // Lazy import to avoid bundling issues in browser
+      return getClaudeModelOptionsStatic();
+    case 'custom':
+      return [DEFAULT_MODELS.google];
+    default:
+      return [];
+  }
+}
+
+/**
+ * Get OpenAI model options (statically defined to avoid require)
+ */
+function getOpenAIModelOptionsStatic(): string[] {
+  return [
+    'gpt-4o',
+    'gpt-4o-2024-05-13',
+    'gpt-4o-2024-08-06',
+    'gpt-4o-mini',
+    'gpt-4o-mini-2024-07-18',
+    'gpt-4-turbo',
+    'gpt-4-turbo-2024-04-09',
+    'gpt-4',
+    'gpt-4-0613',
+    'gpt-4-32k',
+    'gpt-4-32k-0613',
+    'gpt-3.5-turbo',
+    'gpt-3.5-turbo-0125',
+    'gpt-3.5-turbo-1106',
+  ];
+}
+
+/**
+ * Get Claude model options (statically defined to avoid require)
+ */
+function getClaudeModelOptionsStatic(): string[] {
+  return [
+    'claude-3-haiku-20240307',
+    'claude-3-5-haiku-20241022',
+    'claude-3-sonnet-20240229',
+    'claude-3-5-sonnet-20241022',
+    'claude-3-opus-20240229',
+    'claude-3-5-opus-20241022',
+  ];
 }
 
 /**
