@@ -65,10 +65,13 @@ export class P2PSignalingService {
    * @param gameCode - Optional game code for host to use as peer ID
    */
   async initialize(gameCode?: string): Promise<string> {
+    // Capture gameCode to avoid closure issues
+    const hostGameCode = gameCode;
+    
     return new Promise((resolve, reject) => {
       // Use game code as peer ID for hosts (easier to connect)
-      const peerId = this.isHost && gameCode 
-        ? `planar-nexus-${gameCode}` 
+      const peerId = this.isHost && hostGameCode 
+        ? `planar-nexus-${hostGameCode}` 
         : undefined;
 
       this.peer = new Peer(peerId, {
@@ -78,11 +81,12 @@ export class P2PSignalingService {
       this.peer.on('open', (id) => {
         console.log('[P2P] Peer connected with ID:', id);
         this.localPeerId = id;
-        this.gameCode = gameCode || undefined;
         
         // Extract game code from peer ID if we created one
-        if (this.isHost && gameCode) {
-          this.gameCode = gameCode;
+        if (this.isHost && hostGameCode) {
+          this.gameCode = hostGameCode;
+        } else if (!this.isHost) {
+          this.gameCode = null;
         }
         
         this.callbacks.onConnectionStateChange('connected');

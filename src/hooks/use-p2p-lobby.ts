@@ -9,7 +9,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { P2PSignalingService, createHostSignaling, createClientSignaling } from '@/lib/p2p-signaling';
 import { P2PMessage, P2PConnectionState } from '@/lib/webrtc-p2p';
-import { GameLobby, Player, HostGameConfig, PlayerStatus } from '@/lib/multiplayer-types';
+import { GameLobby, Player, HostGameConfig } from '@/lib/multiplayer-types';
 import { generateGameCode, generatePlayerId } from '@/lib/game-code-generator';
 import { lobbyManager } from '@/lib/lobby-manager';
 
@@ -53,24 +53,19 @@ export function useP2PLobby() {
     console.log('[P2P] Received message:', message.type, 'from:', peerId);
     
     switch (message.type) {
-      case 'connection-request':
-        // Handle player joining
-        const payload = message.payload as { playerName: string; gameCode: string; isHost: boolean };
+      case 'connection-request': {
+        const payload = message.payload as { playerName: string; gameCode: string; isHost: boolean } | undefined;
+        if (!payload) break;
         
-        if (isHost && lobby) {
-          // Add player to lobby
+        setLobby(prev => {
+          if (!prev) return prev;
+          
           const newPlayer: Player = {
             id: message.senderId,
             name: payload.playerName,
             status: 'not-ready',
             joinedAt: Date.now(),
           };
-          
-          // Update local lobby state
-          setLobby(prev => prev ? {
-            ...prev,
-            players: [...prev.players, newPlayer],
-          } : null);
           
           // Send acceptance
           signalingRef.current?.sendTo(peerId, {
@@ -82,45 +77,52 @@ export function useP2PLobby() {
               playerId,
             },
           });
-        }
+          
+          return {
+            ...prev,
+            players: [...prev.players, newPlayer],
+          };
+        });
         break;
+      }
         
-      case 'connection-accept':
-        // Host accepted our connection
-        if (!isHost) {
-          // We've joined successfully
-          console.log('[P2P] Connected to game as', message.payload.playerName);
+      case 'connection-accept': {
+        const acceptPayload = message.payload as { playerName: string; playerId?: string } | undefined;
+        if (!isHost && acceptPayload) {
+          console.log('[P2P] Connected to game as', acceptPayload.playerName);
         }
         break;
+      }
         
       case 'game-state-sync':
-        // Handle game state sync (for clients receiving state from host)
         console.log('[P2P] Received game state sync');
         break;
         
       case 'player-action':
-        // Handle player actions
         console.log('[P2P] Received player action');
         break;
         
-      case 'chat':
-        // Handle chat messages
-        const chatPayload = message.payload as { text: string };
-        console.log('[P2P] Chat:', chatPayload.text);
+      case 'chat': {
+        const chatPayload = message.payload as { text: string } | undefined;
+        if (chatPayload) {
+          console.log('[P2P] Chat:', chatPayload.text);
+        }
         break;
+      }
         
       case 'emote':
-        // Handle emotes
         console.log('[P2P] Emote received');
         break;
         
-      case 'error':
-        // Handle error messages
-        const errorPayload = message.payload as { code: string; message: string };
-        setError(errorPayload.message);
+      case 'error': {
+        const errorPayload = message.payload as { code: string; message: string } | undefined;
+        if (errorPayload) {
+          setError(errorPayload.message);
+        }
         break;
+      }
     }
-  }, [isHost, lobby, playerId, getPlayerName]);
+  }, [isHost, playerId, getPlayerName]);
 
   // Create host lobby
   const createHostLobby = useCallback(async (config: HostGameConfig) => {
@@ -128,16 +130,13 @@ export function useP2PLobby() {
     setError(null);
     
     try {
-      // Generate game code
       const gameCode = generateGameCode(6);
       const hostName = localStorage.getItem('planar_nexus_player_name') || 'Host';
       
-      // Create local lobby
       const newLobby = lobbyManager.createLobby(config, hostName);
       setLobby(newLobby);
       setIsHost(true);
       
-      // Initialize signaling as host
       const signaling = createHostSignaling(hostName, {
         onConnectionStateChange: (state) => {
           setConnectionState(state);
@@ -151,14 +150,6 @@ export function useP2PLobby() {
         onPeerDisconnected: (peerId) => {
           console.log('[P2P] Peer disconnected:', peerId);
           setConnectedPeers(prev => prev.filter(id => id !== peerId));
-          
-          // Remove player from lobby
-          if (lobby) {
-            setLobby(prev => prev ? {
-              ...prev,
-              players: prev.players.filter(p => p.id !== peerId),
-            } : null);
-          }
         },
         onError: (err) => {
           console.error('[P2P] Error:', err);
@@ -167,8 +158,6 @@ export function useP2PLobby() {
       });
       
       signalingRef.current = signaling;
-      
-      // Initialize with game code
       await signaling.initialize(gameCode);
       
       console.log('[P2P] Host lobby created with code:', gameCode);
@@ -179,7 +168,7 @@ export function useP2PLobby() {
     } finally {
       setIsConnecting(false);
     }
-  }, [handleMessage, lobby]);
+  }, [handleMessage]);
 
   // Join a game
   const joinGame = useCallback(async (gameCode: string) => {
@@ -189,7 +178,6 @@ export function useP2PLobby() {
     try {
       const playerName = localStorage.getItem('planar_nexus_player_name') || 'Player';
       
-      // Initialize signaling as client
       const signaling = createClientSignaling(playerName, {
         onConnectionStateChange: (state) => {
           setConnectionState(state);
@@ -200,8 +188,8 @@ export function useP2PLobby() {
           console.log('[P2P] Connected to host:', peerId);
           setConnectedPeers([peerId]);
         },
-        onPeerDisconnected: (peerId) => {
-          console.log('[P2P] Disconnected from host:', peerId);
+        onPeerDisconnected: () => {
+          console.log('[P2P] Disconnected from host');
           setConnectedPeers([]);
         },
         onError: (err) => {
@@ -211,8 +199,6 @@ export function useP2PLobby() {
       });
       
       signalingRef.current = signaling;
-      
-      // Initialize and connect
       await signaling.initialize();
       await signaling.connectToGame(gameCode);
       
@@ -234,7 +220,7 @@ export function useP2PLobby() {
       signalingRef.current = null;
     }
     
-    if (lobby && isHost) {
+    if (isHost) {
       lobbyManager.closeLobby();
     }
     
@@ -244,7 +230,7 @@ export function useP2PLobby() {
     setConnectionState('disconnected');
     setConnectedPeers([]);
     setError(null);
-  }, [lobby, isHost]);
+  }, [isHost]);
 
   // Send chat message
   const sendChat = useCallback((text: string) => {
@@ -286,7 +272,6 @@ export function useP2PLobby() {
   const startGame = useCallback(() => {
     if (!isHost || !lobby) return;
     
-    // Notify all peers that game is starting
     signalingRef.current?.broadcast({
       type: 'player-action',
       senderId: playerId,
@@ -297,7 +282,6 @@ export function useP2PLobby() {
       },
     });
     
-    // Navigate to game board
     router.push('/game-board');
   }, [isHost, lobby, playerId, router]);
 
