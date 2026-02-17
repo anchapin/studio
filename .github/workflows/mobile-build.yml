@@ -1,0 +1,196 @@
+name: Mobile Builds
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Build platform'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - ios
+          - android
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
+
+env:
+  NODE_VERSION: '20'
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-ios:
+    name: Build iOS
+    runs-on: macos-latest
+    if: github.event_name == 'release' || github.inputs.platform == 'all' || github.inputs.platform == 'ios'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next.js
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Tauri CLI
+        run: npm install -g @tauri-apps/cli@latest
+
+      - name: Install iOS dependencies
+        run: |
+          brew install cocoapods
+
+      - name: Setup Code Signing
+        if: github.inputs.build_type == 'release'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          # Create keychain
+          echo -n "$APPLE_CERTIFICATE" | base64 --decode -o certificate.p12
+          keychain password set --password $KEYCHAIN_PASSWORD 2>/dev/null || true
+          security create-keychain -p $KEYCHAIN_PASSWORD build.keychain
+          security unlock-keychain -p $KEYCHAIN_PASSWORD build.keychain
+          security import certificate.p12 -P $APPLE_CERTIFICATE_PASSWORD -A -t cert -f pkcs12 -k build.keychain
+          security set-key-partition-list -S apple-tool:,apple: -k $KEYCHAIN_PASSWORD -D $APPLE_SIGNING_IDENTITY build.keychain
+
+      - name: Build iOS App
+        run: |
+          if [ "${{ github.inputs.build_type }}" == "release" ]; then
+            tauri build --target aarch64-apple-ios --bundles ios
+          else
+            tauri build --target aarch64-apple-ios --debug --bundles ios
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+
+      - name: Upload iOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app-debug
+          path: src-tauri/target/*/bundle/ios/*.ipa
+        if: github.inputs.build_type != 'release'
+
+      - name: Upload iOS Release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app-release
+          path: src-tauri/target/*/bundle/ios/*.ipa
+        if: github.inputs.build_type == 'release'
+
+  build-android:
+    name: Build Android
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'release' || github.inputs.platform == 'all' || github.inputs.platform == 'android'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next.js
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Tauri CLI
+        run: npm install -g @tauri-apps/cli@latest
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2
+
+      - name: Build Android App
+        run: |
+          if [ "${{ github.inputs.build_type }}" == "release" ]; then
+            # For release builds, use the signing config from secrets
+            echo "${{ secrets.ANDROID_KEYSTORE }}" | base64 --decode -o android.keystore
+            tauri build --target aarch64-linux-android --bundles apk,aab
+          else
+            tauri build --target aarch64-linux-android --debug --bundles apk
+          fi
+        env:
+          ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Upload Android Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-debug
+          path: src-tauri/target/*/bundle/android/*.apk
+        if: github.inputs.build_type != 'release'
+
+      - name: Upload Android Release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release
+          path: |
+            src-tauri/target/*/bundle/android/*.apk
+            src-tauri/target/*/bundle/android/*.aab
+        if: github.inputs.build_type == 'release'
+
+  release-mobile:
+    name: Create Mobile Release
+    runs-on: ubuntu-latest
+    needs: [build-ios, build-android]
+    if: github.event_name == 'release'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/ios-app-release/*.ipa
+            artifacts/android-release/*.apk
+            artifacts/android-release/*.aab
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
