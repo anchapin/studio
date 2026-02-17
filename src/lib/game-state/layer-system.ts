@@ -553,7 +553,7 @@ export function createCharacteristicDefiningAbility(
     priority: 0,
     canApply: () => true,
     apply: (card) => {
-      let result = { ...card };
+      const result = { ...card };
       if (typeof cda.power === 'number') {
         result.powerModifier = cda.power;
       }

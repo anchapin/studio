@@ -203,7 +203,7 @@ export function declareAttackers(
   });
 
   // Tap attacking creatures
-  let updatedState = { ...state };
+  const updatedState = { ...state };
   const updatedCards = new Map(updatedState.cards);
   
   for (const attacker of attackers) {
