@@ -136,3 +136,6 @@ export * from "./oracle-text-parser";
 
 // Export mana system (CR 106 - Mana, CR 305 - Lands)
 export * from "./mana";
+
+// Export spell casting system (CR 601 - Casting Spells)
+export * from "./spell-casting";
