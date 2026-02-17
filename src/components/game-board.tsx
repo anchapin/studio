@@ -34,7 +34,11 @@ import {
   Crown,
   Flag,
   Handshake,
-  X
+  X,
+  Plus,
+  Minus,
+  Zap,
+  Star
 } from "lucide-react";
 
 // Performance optimization constants
@@ -74,6 +78,13 @@ interface GameBoardProps {
   stack?: StackItem[];
   priorityPlayerId?: string;
   onStackItemClick?: (itemId: string) => void;
+  // Life and counter adjustments (Issue #23)
+  onLifeAdjust?: (playerId: string, amount: number) => void;
+  onPoisonAdjust?: (playerId: string, amount: number) => void;
+  onExperienceAdjust?: (playerId: string, amount: number) => void;
+  onEnergyAdjust?: (playerId: string, amount: number) => void;
+  // Whether to show interactive controls (for local player)
+  showPlayerControls?: boolean;
 }
 
 interface PlayerAreaProps {
@@ -211,6 +222,8 @@ interface PlayerInfoProps {
   isVertical: boolean;
   onLifeAdjust?: (playerId: string, amount: number) => void;
   onPoisonAdjust?: (playerId: string, amount: number) => void;
+  onExperienceAdjust?: (playerId: string, amount: number) => void;
+  onEnergyAdjust?: (playerId: string, amount: number) => void;
   showControls?: boolean;
 }
 
@@ -220,8 +233,26 @@ const PlayerInfo = memo(function PlayerInfo({
   isVertical,
   onLifeAdjust,
   onPoisonAdjust,
+  onExperienceAdjust,
+  onEnergyAdjust,
   showControls = false
 }: PlayerInfoProps) {
+  // Issue #23: Experience and energy counters (stored in card state counters)
+  const experienceCounters = React.useMemo(() => {
+    return player.battlefield.filter(c => c.card.type_line?.includes("Planeswalker")).length > 0 
+      ? player.battlefield.reduce((sum, c) => sum + (c.counters || 0), 0)
+      : 0;
+  }, [player.battlefield]);
+
+  const energyCounters = React.useMemo(() => {
+    return 0; // Would need to track this in player state
+  }, []);
+
+  const handleLifeIncrease = () => onLifeAdjust?.(player.id, 1);
+  const handleLifeDecrease = () => onLifeAdjust?.(player.id, -1);
+  const handlePoisonIncrease = () => onPoisonAdjust?.(player.id, 1);
+  const handlePoisonDecrease = () => onPoisonAdjust?.(player.id, -1);
+
   return (
     <div className={`flex items-center gap-2 ${isVertical ? "flex-col" : ""}`}>
       <div className="flex items-center gap-2">
@@ -237,7 +268,8 @@ const PlayerInfo = memo(function PlayerInfo({
         </div>
       </div>
       <Separator orientation={isVertical ? "horizontal" : "vertical"} className="h-6" />
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap justify-center">
+        {/* Life Total - Issue #23 */}
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger>
@@ -249,7 +281,31 @@ const PlayerInfo = memo(function PlayerInfo({
             <TooltipContent>Life Total</TooltipContent>
           </Tooltip>
         </TooltipProvider>
-        {player.poisonCounters > 0 && (
+        
+        {/* Life Adjustment Controls - Issue #23 */}
+        {showControls && onLifeAdjust && (
+          <div className="flex items-center gap-0.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0"
+              onClick={handleLifeDecrease}
+            >
+              <Minus className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0"
+              onClick={handleLifeIncrease}
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
+
+        {/* Poison Counters - Issue #23 */}
+        {(player.poisonCounters > 0 || showControls) && (
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger>
@@ -262,6 +318,31 @@ const PlayerInfo = memo(function PlayerInfo({
             </Tooltip>
           </TooltipProvider>
         )}
+
+        {/* Poison Adjustment Controls - Issue #23 */}
+        {showControls && onPoisonAdjust && (
+          <div className="flex items-center gap-0.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0"
+              onClick={handlePoisonDecrease}
+              disabled={player.poisonCounters <= 0}
+            >
+              <Minus className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0"
+              onClick={handlePoisonIncrease}
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+          </div>
+        )}
+
+        {/* Commander Damage - Issue #24 */}
         {player.commanderDamage && Object.keys(player.commanderDamage).length > 0 && (
           <Badge variant="outline" className="text-xs">
             CMDR: {Object.values(player.commanderDamage)[0]}
@@ -475,6 +556,12 @@ export function GameBoard({
   stack = [],
   priorityPlayerId,
   onStackItemClick,
+  // Life and counter adjustments (Issue #23)
+  onLifeAdjust,
+  onPoisonAdjust,
+  onExperienceAdjust,
+  onEnergyAdjust,
+  showPlayerControls = false,
 }: GameBoardProps) {
   const currentPlayer = players[currentTurnIndex];
   
