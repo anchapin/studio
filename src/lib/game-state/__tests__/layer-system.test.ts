@@ -181,7 +181,7 @@ describe('Layer System', () => {
       const cdaEffect = createCharacteristicDefiningAbility(
         'source7a',
         'player1',
-        { power: 5, toughness: 5 },
+        { oracleId: 'cda-source', power: 5, toughness: 5 },
         'CDA 5/5'
       );
 
@@ -475,7 +475,7 @@ describe('Layer System', () => {
         const cdaEffect = createCharacteristicDefiningAbility(
           'source',
           'player1',
-          { power: 5, toughness: 5 },
+          { oracleId: 'cda-source', power: 5, toughness: 5 },
           'CDA 5/5',
           layerSystem
         );
@@ -698,7 +698,7 @@ describe('Layer System', () => {
         const cdaEffect = createCharacteristicDefiningAbility(
           'source2',
           'player1',
-          { power: 5, toughness: 5 },
+          { oracleId: 'cda-source', power: 5, toughness: 5 },
           'CDA 5/5',
           layerSystem
         );
