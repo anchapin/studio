@@ -154,7 +154,7 @@ const ZoneCardList = memo(function ZoneCardList({
                 <div 
                   key={color} 
                   className={cn("w-full", colorMap[color] || "bg-gray-400")}
-                  style={{ height: `${100 / card.colors.length}%` }}
+                  style={{ height: `${100 / (card.colors?.length ?? 1)}%` }}
                 />
               ))}
             </div>

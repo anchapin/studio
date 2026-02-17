@@ -139,7 +139,8 @@ function getCardsForColors(colorIdentity: string[]): { creatures: string[]; spel
 
 // Generate deck based on archetype
 export function generateOpponentDeck(input: OpponentDeckGenerationInput): GeneratedDeck {
-  const { format, archetype = 'midrange', colorIdentity = ['W', 'U', 'B', 'R', 'G'].slice(0, Math.floor(Math.random() * 5) + 1) as ['W', 'U', 'B', 'R', 'G'][], powerLevel = 'casual' } = input;
+  const defaultColors: string[] = ['W', 'U', 'B', 'R', 'G'].slice(0, Math.floor(Math.random() * 5) + 1);
+  const { format, archetype = 'midrange', colorIdentity = defaultColors, powerLevel = 'casual' } = input;
   
   const config = ARCHETYPE_CONFIGS[archetype];
   const cards: Array<{ name: string; quantity: number }> = [];
@@ -149,7 +150,8 @@ export function generateOpponentDeck(input: OpponentDeckGenerationInput): Genera
   
   // Add lands (37-40 for commander)
   const landCount = format === 'commander' ? 38 : 24;
-  const basicLands = colorIdentity.map(c => CARD_POOL.lands_basic[['W', 'U', 'B', 'R', 'G'].indexOf(c)] || 'Plains');
+  const colorIndices: Record<string, number> = { W: 0, U: 1, B: 2, R: 3, G: 4 };
+  const basicLands = colorIdentity.map(c => CARD_POOL.lands_basic[colorIndices[c]] || 'Plains');
   
   // Distribute basic lands
   for (const land of basicLands) {
