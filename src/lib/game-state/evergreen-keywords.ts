@@ -254,9 +254,10 @@ export function hasDefender(card: CardInstance): boolean {
 }
 
 /**
- * Check if a creature can attack
+ * Check if a creature can attack (based on defender keyword only)
+ * Note: This is a simple check. For full attack eligibility, use combat.canAttack
  */
-export function canAttack(card: CardInstance): boolean {
+export function canAttackIfNotDefender(card: CardInstance): boolean {
   return !hasDefender(card);
 }
 
@@ -266,10 +267,12 @@ export function canAttack(card: CardInstance): boolean {
  * Get the base power of a creature
  */
 function getPowerValue(card: CardInstance): number {
-  if (card.power !== undefined) {
-    return typeof card.power === 'number' ? card.power : 0;
+  // Try to get power/toughness from card_data (ScryfallCard)
+  const cardData = card.cardData;
+  if (cardData && 'power' in cardData && cardData.power) {
+    return typeof cardData.power === 'number' ? cardData.power : parseInt(String(cardData.power), 10) || 0;
   }
-  // Try to parse from card data
+  // Try to parse from type_line
   const ptMatch = card.cardData.type_line?.match(/(\d+)\/(\d+)/);
   if (ptMatch) {
     return parseInt(ptMatch[1], 10);
@@ -281,10 +284,12 @@ function getPowerValue(card: CardInstance): number {
  * Get the base toughness of a creature
  */
 function getToughnessValue(card: CardInstance): number {
-  if (card.toughness !== undefined) {
-    return typeof card.toughness === 'number' ? card.toughness : 0;
+  // Try to get power/toughness from card_data (ScryfallCard)
+  const cardData = card.cardData;
+  if (cardData && 'toughness' in cardData && cardData.toughness) {
+    return typeof cardData.toughness === 'number' ? cardData.toughness : parseInt(String(cardData.toughness), 10) || 0;
   }
-  // Try to parse from card data
+  // Try to parse from type_line
   const ptMatch = card.cardData.type_line?.match(/(\d+)\/(\d+)/);
   if (ptMatch) {
     return parseInt(ptMatch[2], 10);
@@ -412,7 +417,7 @@ export function getKeywordDescriptions(card: CardInstance): string[] {
   if (hasFlash(card)) descriptions.push('Flash');
   if (hasHaste(card)) descriptions.push('Haste');
   if (hasHexproof(card)) descriptions.push('Hexproof');
-  if (hasIndestructible(card)) descriptions.push('Indestructible');
+  if (isIndestructible(card)) descriptions.push('Indestructible');
   if (hasLifelink(card)) descriptions.push('Lifeline');
   if (hasMenace(card)) descriptions.push('Menace');
   if (hasProtectionFrom(card, 'black')) descriptions.push('Protection from Black');
