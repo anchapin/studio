@@ -14,6 +14,11 @@ export interface GameModeConfig {
   commanderDamage: boolean;
   sharedTurns: boolean;
   teamChat: boolean;
+  // Team-specific settings
+  isTeamMode: boolean;
+  teamSize?: number;
+  sharedLife?: boolean;
+  sharedBlockers?: boolean;
 }
 
 export const GAME_MODES: Record<GameMode, GameModeConfig> = {
@@ -27,17 +32,22 @@ export const GAME_MODES: Record<GameMode, GameModeConfig> = {
     commanderDamage: false,
     sharedTurns: false,
     teamChat: false,
+    isTeamMode: false,
   },
   '2v2': {
     mode: '2v2',
     name: 'Two-Headed Giant',
-    description: 'Teams of two players sharing turns',
+    description: 'Teams of two players sharing turns and life total',
     minPlayers: 4,
     maxPlayers: 4,
-    startingLife: 30,
+    startingLife: 30, // Shared life total for the team
     commanderDamage: false,
     sharedTurns: true,
     teamChat: true,
+    isTeamMode: true,
+    teamSize: 2,
+    sharedLife: true,
+    sharedBlockers: true,
   },
   'ffa': {
     mode: 'ffa',
@@ -49,6 +59,7 @@ export const GAME_MODES: Record<GameMode, GameModeConfig> = {
     commanderDamage: false,
     sharedTurns: false,
     teamChat: false,
+    isTeamMode: false,
   },
   'commander-1v1': {
     mode: 'commander-1v1',
@@ -60,6 +71,7 @@ export const GAME_MODES: Record<GameMode, GameModeConfig> = {
     commanderDamage: true,
     sharedTurns: false,
     teamChat: false,
+    isTeamMode: false,
   },
   'commander-ffa': {
     mode: 'commander-ffa',
@@ -71,6 +83,7 @@ export const GAME_MODES: Record<GameMode, GameModeConfig> = {
     commanderDamage: true,
     sharedTurns: false,
     teamChat: false,
+    isTeamMode: false,
   },
 };
 

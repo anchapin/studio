@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PlayerState, PlayerCount, ZoneType } from "@/types/game";
+import { PlayerState, PlayerCount, ZoneType, TeamState, TeamId } from "@/types/game";
 import { HandDisplay } from "@/components/hand-display";
 import {
   Skull,
@@ -69,6 +69,14 @@ interface GameBoardProps {
   hasActiveDrawOffer?: boolean;
   hasPlayerOfferedDraw?: boolean;
   isGameOver?: boolean;
+  // Team mode props
+  isTeamMode?: boolean;
+  teams?: TeamState[];
+  teamSettings?: {
+    sharedLife: boolean;
+    sharedBlockers: boolean;
+    teamChat: boolean;
+  };
 }
 
 interface PlayerAreaProps {

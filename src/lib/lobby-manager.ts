@@ -3,12 +3,35 @@
  * Handles local lobby state for hosting games before connecting to signaling server
  */
 
-import { GameLobby, Player, HostGameConfig, LobbyStatus, PlayerStatus, GameMode } from './multiplayer-types';
+import { GameLobby, Player, HostGameConfig, LobbyStatus, PlayerStatus, GameMode, Team, TeamId, TeamSettings } from './multiplayer-types';
 import { generateGameCode, generateLobbyId, generatePlayerId } from './game-code-generator';
 import { publicLobbyBrowser } from './public-lobby-browser';
 import { validateDeckForLobby } from './format-validator';
-import { getGameModeForPlayerCount } from './game-mode';
+import { getGameModeForPlayerCount, getGameModeConfig, GAME_MODES } from './game-mode';
 import type { SavedDeck } from '@/app/actions';
+
+// Default team configurations
+const DEFAULT_TEAMS: Team[] = [
+  {
+    id: 'team-a',
+    name: 'Team Alpha',
+    color: '#3b82f6', // Blue
+    playerIds: [],
+  },
+  {
+    id: 'team-b',
+    name: 'Team Beta',
+    color: '#ef4444', // Red
+    playerIds: [],
+  },
+];
+
+const DEFAULT_TEAM_SETTINGS: TeamSettings = {
+  sharedLife: true,
+  sharedBlockers: true,
+  teamChat: true,
+  startingLifePerTeam: 30,
+};
 
 /**
  * Client-side lobby manager for host game functionality
@@ -55,6 +78,12 @@ class LobbyManager {
 
     this.currentLobby = lobby;
     this.hostPlayerId = hostPlayerId;
+
+    // Initialize teams for team-based modes
+    const modeConfig = getGameModeConfig(gameMode);
+    if (modeConfig.isTeamMode) {
+      this.initializeTeams();
+    }
 
     // Store in localStorage for persistence
     this.saveLobbyToStorage();
@@ -349,6 +378,235 @@ class LobbyManager {
    */
   getHostPlayerId(): string | null {
     return this.hostPlayerId;
+  }
+
+  /**
+   * Initialize teams for 2v2 mode
+   */
+  initializeTeams(): void {
+    if (!this.currentLobby) return;
+    
+    const modeConfig = getGameModeConfig(this.currentLobby.gameMode);
+    if (!modeConfig.isTeamMode) return;
+
+    // Initialize teams with empty player IDs
+    this.currentLobby.teams = DEFAULT_TEAMS.map(team => ({
+      ...team,
+      playerIds: [],
+      sharedLifeTotal: modeConfig.sharedLife ? modeConfig.startingLife : undefined,
+    }));
+
+    this.currentLobby.teamSettings = {
+      ...DEFAULT_TEAM_SETTINGS,
+      sharedLife: modeConfig.sharedLife ?? true,
+      sharedBlockers: modeConfig.sharedBlockers ?? true,
+      teamChat: modeConfig.teamChat ?? true,
+      startingLifePerTeam: modeConfig.startingLife,
+    };
+
+    this.saveLobbyToStorage();
+  }
+
+  /**
+   * Assign a player to a team
+   */
+  assignPlayerToTeam(playerId: string, teamId: TeamId): boolean {
+    if (!this.currentLobby || !this.currentLobby.teams) return false;
+
+    const player = this.currentLobby.players.find(p => p.id === playerId);
+    if (!player) return false;
+
+    // Remove player from any existing team
+    this.currentLobby.teams.forEach(team => {
+      team.playerIds = team.playerIds.filter(id => id !== playerId);
+    });
+
+    // Add player to new team
+    const targetTeam = this.currentLobby.teams.find(t => t.id === teamId);
+    if (!targetTeam) return false;
+
+    // Check if team is full (max 2 players per team in 2v2)
+    if (targetTeam.playerIds.length >= 2) return false;
+
+    targetTeam.playerIds.push(playerId);
+    player.teamId = teamId;
+
+    this.saveLobbyToStorage();
+    return true;
+  }
+
+  /**
+   * Remove a player from their team
+   */
+  removePlayerFromTeam(playerId: string): boolean {
+    if (!this.currentLobby || !this.currentLobby.teams) return false;
+
+    const player = this.currentLobby.players.find(p => p.id === playerId);
+    if (!player) return false;
+
+    // Remove player from their team
+    this.currentLobby.teams.forEach(team => {
+      team.playerIds = team.playerIds.filter(id => id !== playerId);
+    });
+
+    player.teamId = undefined;
+    this.saveLobbyToStorage();
+    return true;
+  }
+
+  /**
+   * Auto-assign players to teams (for quick start)
+   */
+  autoAssignTeams(): void {
+    if (!this.currentLobby || !this.currentLobby.teams) return;
+
+    // Initialize teams first if needed
+    if (this.currentLobby.teams.length === 0) {
+      this.initializeTeams();
+    }
+
+    // Clear existing assignments
+    this.currentLobby.teams.forEach(team => {
+      team.playerIds = [];
+    });
+    this.currentLobby.players.forEach(player => {
+      player.teamId = undefined;
+    });
+
+    // Assign players alternately to teams
+    this.currentLobby.players.forEach((player, index) => {
+      const teamId: TeamId = index % 2 === 0 ? 'team-a' : 'team-b';
+      this.assignPlayerToTeam(player.id, teamId);
+    });
+
+    this.saveLobbyToStorage();
+  }
+
+  /**
+   * Get a player's team
+   */
+  getPlayerTeam(playerId: string): Team | undefined {
+    if (!this.currentLobby || !this.currentLobby.teams) return undefined;
+    
+    const player = this.currentLobby.players.find(p => p.id === playerId);
+    if (!player || !player.teamId) return undefined;
+    
+    return this.currentLobby.teams.find(t => t.id === player.teamId);
+  }
+
+  /**
+   * Get all players on a team
+   */
+  getTeamPlayers(teamId: TeamId): Player[] {
+    if (!this.currentLobby) return [];
+    
+    return this.currentLobby.players.filter(p => p.teamId === teamId);
+  }
+
+  /**
+   * Check if teams are valid (all players assigned, teams balanced)
+   */
+  areTeamsValid(): boolean {
+    if (!this.currentLobby || !this.currentLobby.teams) return false;
+
+    const modeConfig = getGameModeConfig(this.currentLobby.gameMode);
+    if (!modeConfig.isTeamMode) return true;
+
+    // All players must be assigned to a team
+    const allAssigned = this.currentLobby.players.every(p => p.teamId);
+    if (!allAssigned) return false;
+
+    // Teams must be balanced (equal or off by 1)
+    const teamSizes = this.currentLobby.teams.map(t => t.playerIds.length);
+    const sizeDiff = Math.abs(teamSizes[0] - teamSizes[1]);
+    
+    return sizeDiff <= 1;
+  }
+
+  /**
+   * Update team settings
+   */
+  updateTeamSettings(settings: Partial<TeamSettings>): boolean {
+    if (!this.currentLobby) return false;
+
+    this.currentLobby.teamSettings = {
+      ...this.currentLobby.teamSettings,
+      ...settings,
+    };
+
+    this.saveLobbyToStorage();
+    return true;
+  }
+
+  /**
+   * Update team name
+   */
+  updateTeamName(teamId: TeamId, name: string): boolean {
+    if (!this.currentLobby || !this.currentLobby.teams) return false;
+
+    const team = this.currentLobby.teams.find(t => t.id === teamId);
+    if (!team) return false;
+
+    team.name = name;
+    this.saveLobbyToStorage();
+    return true;
+  }
+
+  /**
+   * Check if a player can attack another player (team rules)
+   */
+  canAttackPlayer(attackerId: string, defenderId: string): boolean {
+    if (!this.currentLobby) return true;
+
+    const modeConfig = getGameModeConfig(this.currentLobby.gameMode);
+    if (!modeConfig.isTeamMode) return true;
+
+    const attacker = this.currentLobby.players.find(p => p.id === attackerId);
+    const defender = this.currentLobby.players.find(p => p.id === defenderId);
+
+    if (!attacker || !defender) return true;
+
+    // Cannot attack teammates
+    if (attacker.teamId && defender.teamId && attacker.teamId === defender.teamId) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Get the opponent team for a player
+   */
+  getOpponentTeam(playerId: string): Team | undefined {
+    if (!this.currentLobby || !this.currentLobby.teams) return undefined;
+
+    const player = this.currentLobby.players.find(p => p.id === playerId);
+    if (!player || !player.teamId) return undefined;
+
+    return this.currentLobby.teams.find(t => t.id !== player.teamId);
+  }
+
+  /**
+   * Check if a team has lost (all players eliminated)
+   */
+  isTeamEliminated(teamId: TeamId): boolean {
+    if (!this.currentLobby) return false;
+
+    const teamPlayers = this.getTeamPlayers(teamId);
+    // This would need to be connected to actual game state
+    // For now, return false as placeholder
+    return false;
+  }
+
+  /**
+   * Get winning team if game is over
+   */
+  getWinningTeam(): Team | undefined {
+    if (!this.currentLobby || !this.currentLobby.teams) return undefined;
+
+    // This would need to be connected to actual game state
+    // For now, return undefined as placeholder
+    return undefined;
   }
 }
 
