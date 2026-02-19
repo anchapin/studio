@@ -60,7 +60,7 @@ type AnimationPhase = 'idle' | 'windup' | 'strike' | 'impact' | 'recoil' | 'fade
 export function AttackAnimation({ action, onComplete, className }: CombatAnimationProps) {
   const [phase, setPhase] = useState<AnimationPhase>('idle');
   const [trailPositions, setTrailPositions] = useState<{ x: number; y: number }[]>([]);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     // Windup phase - prepare to attack
