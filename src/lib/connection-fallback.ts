@@ -122,71 +122,66 @@ export class ConnectionFallbackManager {
   /**
    * Connect with automatic fallback
    */
-  private async connectWithFallback(): Promise<ConnectionType> {
-    let resolved = false;
-    let rejectFn: ((error: Error) => void) | null = null;
-    let resolveFn: ((type: ConnectionType) => void) | null = null;
+  private connectWithFallback(): Promise<ConnectionType> {
+    return new Promise<ConnectionType>((resolve, reject) => {
+      let resolved = false;
 
-    const connectionPromise = new Promise<ConnectionType>((resolve, reject) => {
-      resolveFn = resolve;
-      rejectFn = reject;
-    });
-
-    // Set up fallback timer
-    if (this.options.enableFallback && isWebSocketAvailable() && this.options.websocketUrl) {
-      this.fallbackTimer = setTimeout(() => {
-        if (!resolved && this.state.activeConnection !== 'webrtc') {
-          console.log('[ConnectionFallback] WebRTC connection timeout, falling back to WebSocket');
-          this.connectWebSocket()
-            .then((connectionType) => {
-              resolved = true;
-              resolveFn?.(connectionType);
-            })
-            .catch((error) => {
-              if (!resolved) {
-                rejectFn?.(error);
-              }
-            });
-        }
-      }, this.options.fallbackTimeout);
-    }
-
-    // Try WebRTC connection
-    try {
-      const connectionType = await this.connectWebRTC();
-      if (this.fallbackTimer) {
-        clearTimeout(this.fallbackTimer);
-        this.fallbackTimer = null;
-      }
-      resolved = true;
-      resolveFn?.(connectionType);
-    } catch (error) {
-      console.error('[ConnectionFallback] WebRTC connection failed:', error);
-      this.state.lastError = error instanceof Error ? error.message : 'WebRTC connection failed';
-      
-      // If fallback timer hasn't triggered yet and WebSocket is available
-      if (!resolved && this.options.enableFallback && isWebSocketAvailable() && this.options.websocketUrl) {
-        // Clear the timer and try WebSocket immediately
-        if (this.fallbackTimer) {
-          clearTimeout(this.fallbackTimer);
-          this.fallbackTimer = null;
-        }
-        
-        try {
-          const connectionType = await this.connectWebSocket();
-          resolved = true;
-          resolveFn?.(connectionType);
-        } catch (_wsError) {
-          if (!resolved) {
-            rejectFn?.(new Error(`Both WebRTC and WebSocket failed: ${error instanceof Error ? error.message : 'Unknown error'}`));
+      // Set up fallback timer
+      if (this.options.enableFallback && isWebSocketAvailable() && this.options.websocketUrl) {
+        this.fallbackTimer = setTimeout(() => {
+          if (!resolved && this.state.activeConnection !== 'webrtc') {
+            console.log('[ConnectionFallback] WebRTC connection timeout, falling back to WebSocket');
+            this.connectWebSocket()
+              .then((connectionType) => {
+                resolved = true;
+                resolve(connectionType);
+              })
+              .catch((error) => {
+                if (!resolved) {
+                  reject(error);
+                }
+              });
           }
-        }
-      } else if (!resolved && !this.options.enableFallback) {
-        rejectFn?.(error as Error);
+        }, this.options.fallbackTimeout);
       }
-    }
 
-    return connectionPromise;
+      // Try WebRTC connection
+      this.connectWebRTC()
+        .then((connectionType) => {
+          if (this.fallbackTimer) {
+            clearTimeout(this.fallbackTimer);
+            this.fallbackTimer = null;
+          }
+          resolved = true;
+          resolve(connectionType);
+        })
+        .catch((error) => {
+          console.error('[ConnectionFallback] WebRTC connection failed:', error);
+          this.state.lastError = error instanceof Error ? error.message : 'WebRTC connection failed';
+          
+          // If fallback timer hasn't triggered yet and WebSocket is available
+          if (!resolved && this.options.enableFallback && isWebSocketAvailable() && this.options.websocketUrl) {
+            // Clear the timer and try WebSocket immediately
+            if (this.fallbackTimer) {
+              clearTimeout(this.fallbackTimer);
+              this.fallbackTimer = null;
+            }
+            
+            this.connectWebSocket()
+              .then((connectionType) => {
+                resolved = true;
+                resolve(connectionType);
+              })
+              .catch(() => {
+                if (!resolved) {
+                  reject(new Error(`Both WebRTC and WebSocket failed: ${error instanceof Error ? error.message : 'Unknown error'}`));
+                }
+              });
+          } else if (!resolved && !this.options.enableFallback) {
+            reject(error);
+          }
+        });
+    });
   }
 
   /**
