@@ -19,6 +19,8 @@ import {
 } from './card-instance';
 import { dealDamageToCard, destroyCard } from './keyword-actions';
 import { replacementEffectManager } from './replacement-effects';
+import { checkStateBasedActions } from './state-based-actions';
+import { dealCommanderDamage, isCommander } from './commander-damage';
 
 /**
  * Result of a combat action
@@ -355,6 +357,10 @@ export function declareBlockers(
 
 /**
  * Resolve combat damage
+ * After dealing damage, state-based actions are checked to handle:
+ * - Creatures with lethal damage dying
+ * - Players losing from damage/commander damage/poison
+ * Issue #267: State-based actions (SBA) system
  */
 export function resolveCombatDamage(state: GameState): CombatActionResult {
   if (!state.combat.inCombatPhase || state.combat.attackers.length === 0) {
@@ -378,7 +384,7 @@ export function resolveCombatDamage(state: GameState): CombatActionResult {
       attackerCard.cardData.oracle_text?.toLowerCase().includes('trample');
 
     const assignedBlockers = state.combat.blockers.get(attacker.cardId);
-    
+
     // Check if attacker is blocked
     if (!assignedBlockers || assignedBlockers.length === 0) {
       // Unblocked - damage goes to defender
@@ -392,7 +398,10 @@ export function resolveCombatDamage(state: GameState): CombatActionResult {
           // Check for lifelink on attacker
           const attackerHasLifelink = attackerCard.cardData.keywords?.includes('Lifelink') ||
             attackerCard.cardData.oracle_text?.toLowerCase().includes('lifelink');
-          
+
+          // Check if attacker is a commander
+          const isAttackerCommander = isCommander(attackerCard);
+
           // Apply damage to player
           updatedState = {
             ...updatedState,
@@ -401,6 +410,22 @@ export function resolveCombatDamage(state: GameState): CombatActionResult {
               life: Math.max(0, defender.life - attackerPower),
             }),
           };
+
+          // Track commander damage if applicable
+          if (isAttackerCommander) {
+            const commanderDamageResult = dealCommanderDamage(
+              updatedState,
+              attacker.cardId,
+              attacker.defenderId as PlayerId,
+              attackerPower
+            );
+            if (commanderDamageResult.success) {
+              updatedState = commanderDamageResult.state;
+              if (commanderDamageResult.playerLost) {
+                damageEvents.push(`${attackerCard.cardData.name} dealt lethal commander damage to ${defender.name}`);
+              }
+            }
+          }
 
           if (attackerHasLifelink) {
             // Gain life equal to damage dealt
@@ -471,16 +496,6 @@ export function resolveCombatDamage(state: GameState): CombatActionResult {
 
         remainingDamage -= damage;
         damageEvents.push(`${attackerCard.cardData.name} deals ${damage} to ${blockerCard.cardData.name}`);
-
-        // Check for deathtouch lethal damage
-        if (blockerHasDeathtouch && damage > 0) {
-          const damagedBlocker = updatedState.cards.get(blocker.cardId);
-          if (damagedBlocker && hasLethalDamage(damagedBlocker)) {
-            const destroyResult = destroyCard(updatedState, blocker.cardId);
-            updatedState = destroyResult.state;
-            damageEvents.push(`${blockerCard.cardData.name} destroyed (deathtouch)`);
-          }
-        }
       }
 
       // Handle trample excess damage
@@ -500,37 +515,14 @@ export function resolveCombatDamage(state: GameState): CombatActionResult {
     }
   }
 
-  // Check for creatures with lethal damage (they die after combat)
-  const creaturesToDestroy: CardInstanceId[] = [];
+  // After all combat damage is dealt, check state-based actions
+  // This handles creatures with lethal damage dying, players losing, etc.
+  const sbaResult = checkStateBasedActions(updatedState);
+  updatedState = sbaResult.state;
   
-  // Check attackers
-  for (const attacker of state.combat.attackers) {
-    const attackerCard = updatedState.cards.get(attacker.cardId);
-    if (attackerCard && isCreature(attackerCard) && hasLethalDamage(attackerCard)) {
-      creaturesToDestroy.push(attacker.cardId);
-    }
-  }
-
-  // Check blockers
-  for (const [, blockers] of state.combat.blockers) {
-    for (const blocker of blockers) {
-      const blockerCard = updatedState.cards.get(blocker.cardId);
-      if (blockerCard && isCreature(blockerCard) && hasLethalDamage(blockerCard)) {
-        if (!creaturesToDestroy.includes(blocker.cardId)) {
-          creaturesToDestroy.push(blocker.cardId);
-        }
-      }
-    }
-  }
-
-  // Destroy creatures with lethal damage
-  for (const cardId of creaturesToDestroy) {
-    const destroyResult = destroyCard(updatedState, cardId);
-    updatedState = destroyResult.state;
-    const card = updatedState.cards.get(cardId);
-    if (card) {
-      damageEvents.push(`${card?.cardData.name || cardId} destroyed (lethal damage)`);
-    }
+  // Add SBA descriptions to damage events
+  for (const desc of sbaResult.descriptions) {
+    damageEvents.push(desc);
   }
 
   // Clear combat state

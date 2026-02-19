@@ -15,6 +15,7 @@ export {
   generateCardInstanceId,
   createCardInstance,
   createToken,
+  initializePlaneswalkerLoyalty,
   tapCard,
   untapCard,
   flipCard,

@@ -28,6 +28,7 @@ import {
   isPlaneswalker,
   getToughness,
   hasLethalDamage,
+  initializePlaneswalkerLoyalty,
 } from '../card-instance';
 import { dealDamageToCard, destroyCard, exileCard } from '../keyword-actions';
 import type { ScryfallCard } from '@/app/actions';
@@ -708,10 +709,14 @@ describe('State-Based Actions', () => {
       const jaceData1 = createMockPlaneswalker('Jace1', 3);
       jaceData1.type_line = 'Legendary Planeswalker - Jace';
       const jace1 = createCardInstance(jaceData1, playerIds[0], playerIds[0]);
-      
+      // Initialize loyalty counters
+      jace1.counters = [{ type: 'loyalty', count: 3 }];
+
       const jaceData2 = createMockPlaneswalker('Jace2', 3);
       jaceData2.type_line = 'Legendary Planeswalker - Jace';
       const jace2 = createCardInstance(jaceData2, playerIds[0], playerIds[0]);
+      // Initialize loyalty counters
+      jace2.counters = [{ type: 'loyalty', count: 3 }];
 
       const battlefield = state.zones.get(`${playerIds[0]}-battlefield`)!;
       state.cards.set(jace1.id, jace1);
@@ -729,10 +734,10 @@ describe('State-Based Actions', () => {
 
       // One should remain, one should be destroyed
       // Filter to only count the jace planeswalkers
-      const jaceOnBattlefield = battlefieldAfter.cardIds.filter(id => 
+      const jaceOnBattlefield = battlefieldAfter.cardIds.filter(id =>
         id === jace1.id || id === jace2.id
       );
-      const jaceInGraveyard = graveyard.cardIds.filter(id => 
+      const jaceInGraveyard = graveyard.cardIds.filter(id =>
         id === jace1.id || id === jace2.id
       );
       expect(jaceOnBattlefield.length).toBe(1);
@@ -861,6 +866,356 @@ describe('State-Based Actions', () => {
       const player = result.state.players.get(playerIds[0]);
       expect(player?.hasLost).toBe(true);
       expect(player?.lossReason).toBe('Attempted to draw from empty library');
+    });
+  });
+
+  describe('Commander Damage (CR 903.10a)', () => {
+    it('should make a player lose with 21 or more commander damage from same commander', () => {
+      let state = createInitialGameState(['Alice', 'Bob'], 20, false);
+      state = startGame(state);
+
+      const playerIds = Array.from(state.players.keys());
+      const aliceId = playerIds[0];
+      const bobId = playerIds[1];
+
+      // Create a commander (legendary creature)
+      const commanderData = createMockCreature('Commander', 4, 4, [], true);
+      const commander = createCardInstance(commanderData, bobId, bobId);
+
+      // Add commander to Bob's battlefield
+      const battlefield = state.zones.get(`${bobId}-battlefield`)!;
+      state.cards.set(commander.id, commander);
+      state.zones.set(`${bobId}-battlefield`, {
+        ...battlefield,
+        cardIds: [...battlefield.cardIds, commander.id],
+      });
+
+      // Give Alice 21 commander damage from this commander
+      const alice = state.players.get(aliceId)!;
+      const updatedCommanderDamage = new Map(alice.commanderDamage);
+      updatedCommanderDamage.set(commander.id, 21);
+      state.players.set(aliceId, {
+        ...alice,
+        commanderDamage: updatedCommanderDamage,
+      });
+
+      const result = checkStateBasedActions(state);
+
+      expect(result.actionsPerformed).toBe(true);
+      const updatedAlice = result.state.players.get(aliceId);
+      expect(updatedAlice?.hasLost).toBe(true);
+      expect(updatedAlice?.lossReason).toContain('commander damage');
+    });
+
+    it('should not make a player lose with less than 21 commander damage', () => {
+      let state = createInitialGameState(['Alice', 'Bob'], 20, false);
+      state = startGame(state);
+
+      const playerIds = Array.from(state.players.keys());
+      const aliceId = playerIds[0];
+
+      // Give Alice 20 commander damage
+      const alice = state.players.get(aliceId)!;
+      const updatedCommanderDamage = new Map(alice.commanderDamage);
+      updatedCommanderDamage.set('commander-1', 20);
+      state.players.set(aliceId, {
+        ...alice,
+        commanderDamage: updatedCommanderDamage,
+      });
+
+      const result = checkStateBasedActions(state);
+
+      expect(result.actionsPerformed).toBe(false);
+      const updatedAlice = result.state.players.get(aliceId);
+      expect(updatedAlice?.hasLost).toBe(false);
+    });
+
+    it('should handle multiple commanders dealing damage', () => {
+      let state = createInitialGameState(['Alice', 'Bob'], 20, false);
+      state = startGame(state);
+
+      const playerIds = Array.from(state.players.keys());
+      const aliceId = playerIds[0];
+
+      // Give Alice 20 damage from commander 1 and 21 from commander 2
+      const alice = state.players.get(aliceId)!;
+      const updatedCommanderDamage = new Map(alice.commanderDamage);
+      updatedCommanderDamage.set('commander-1', 20);
+      updatedCommanderDamage.set('commander-2', 21);
+      state.players.set(aliceId, {
+        ...alice,
+        commanderDamage: updatedCommanderDamage,
+      });
+
+      const result = checkStateBasedActions(state);
+
+      expect(result.actionsPerformed).toBe(true);
+      const updatedAlice = result.state.players.get(aliceId);
+      expect(updatedAlice?.hasLost).toBe(true);
+      expect(updatedAlice?.lossReason).toContain('commander damage');
+    });
+  });
+
+  describe('Combat Damage Integration', () => {
+    it('should destroy creatures with lethal damage after combat', () => {
+      let state = createInitialGameState(['Alice', 'Bob'], 20, false);
+      state = startGame(state);
+
+      const playerIds = Array.from(state.players.keys());
+      const aliceId = playerIds[0];
+      const bobId = playerIds[1];
+
+      // Create creatures for both players
+      const aliceCreatureData = createMockCreature('Alice Creature', 3, 3);
+      const aliceCreature = createCardInstance(aliceCreatureData, aliceId, aliceId);
+      const bobCreatureData = createMockCreature('Bob Creature', 3, 3);
+      const bobCreature = createCardInstance(bobCreatureData, bobId, bobId);
+
+      // Add creatures to battlefields
+      const aliceBattlefield = state.zones.get(`${aliceId}-battlefield`)!;
+      const bobBattlefield = state.zones.get(`${bobId}-battlefield`)!;
+      state.cards.set(aliceCreature.id, aliceCreature);
+      state.cards.set(bobCreature.id, bobCreature);
+      state.zones.set(`${aliceId}-battlefield`, {
+        ...aliceBattlefield,
+        cardIds: [aliceCreature.id],
+      });
+      state.zones.set(`${bobId}-battlefield`, {
+        ...bobBattlefield,
+        cardIds: [bobCreature.id],
+      });
+
+      // Deal combat damage to both creatures
+      state = dealDamageToCard(state, aliceCreature.id, 3, true).state;
+      state = dealDamageToCard(state, bobCreature.id, 3, true).state;
+
+      // Check SBAs - both creatures should be destroyed
+      const result = checkStateBasedActions(state);
+
+      expect(result.actionsPerformed).toBe(true);
+      const aliceGraveyard = result.state.zones.get(`${aliceId}-graveyard`)!;
+      const bobGraveyard = result.state.zones.get(`${bobId}-graveyard`)!;
+      expect(aliceGraveyard.cardIds).toContain(aliceCreature.id);
+      expect(bobGraveyard.cardIds).toContain(bobCreature.id);
+    });
+
+    it('should handle deathtouch lethal damage', () => {
+      let state = createInitialGameState(['Alice', 'Bob'], 20, false);
+      state = startGame(state);
+
+      const playerIds = Array.from(state.players.keys());
+      const aliceId = playerIds[0];
+
+      // Create a creature with deathtouch
+      const deathtouchCreatureData = createMockCreature('Deathtouch Creature', 1, 1, ['Deathtouch']);
+      const deathtouchCreature = createCardInstance(deathtouchCreatureData, aliceId, aliceId);
+
+      // Create a larger creature
+      const bigCreatureData = createMockCreature('Big Creature', 5, 5);
+      const bigCreature = createCardInstance(bigCreatureData, aliceId, aliceId);
+
+      // Add creatures to battlefield
+      const battlefield = state.zones.get(`${aliceId}-battlefield`)!;
+      state.cards.set(deathtouchCreature.id, deathtouchCreature);
+      state.cards.set(bigCreature.id, bigCreature);
+      state.zones.set(`${aliceId}-battlefield`, {
+        ...battlefield,
+        cardIds: [deathtouchCreature.id, bigCreature.id],
+      });
+
+      // Deal 1 damage from deathtouch creature to big creature
+      state = dealDamageToCard(state, bigCreature.id, 1, true, deathtouchCreature.id).state;
+
+      // Check SBAs - big creature should be destroyed due to deathtouch
+      const result = checkStateBasedActions(state);
+
+      expect(result.actionsPerformed).toBe(true);
+      const graveyard = result.state.zones.get(`${aliceId}-graveyard`)!;
+      expect(graveyard.cardIds).toContain(bigCreature.id);
+    });
+  });
+
+  describe('Planeswalker Loyalty Initialization', () => {
+    it('should initialize planeswalker with loyalty counters', () => {
+      const pwData = createMockPlaneswalker('Test Planeswalker', 4);
+      const planeswalker = createCardInstance(pwData, 'player1', 'player1');
+
+      // Initialize loyalty
+      const initialized = initializePlaneswalkerLoyalty(planeswalker);
+
+      const loyaltyCounter = initialized.counters?.find(c => c.type === 'loyalty');
+      expect(loyaltyCounter).toBeDefined();
+      expect(loyaltyCounter?.count).toBe(4);
+    });
+
+    it('should not modify non-planeswalker cards', () => {
+      const creatureData = createMockCreature('Test Creature', 3, 3);
+      const creature = createCardInstance(creatureData, 'player1', 'player1');
+
+      const result = initializePlaneswalkerLoyalty(creature);
+
+      expect(result).toBe(creature);
+      expect(result.counters).toEqual([]);
+    });
+
+    it('should handle planeswalkers without loyalty field', () => {
+      const pwData = createMockPlaneswalker('Test Planeswalker', 0);
+      pwData.loyalty = undefined as any;
+      const planeswalker = createCardInstance(pwData, 'player1', 'player1');
+
+      const result = initializePlaneswalkerLoyalty(planeswalker);
+
+      expect(result.counters).toEqual([]);
+    });
+  });
+
+  describe('Equipment and Aura Attachment Rules', () => {
+    it('should destroy Equipment when attached creature leaves battlefield', () => {
+      let state = createInitialGameState(['Alice'], 20, false);
+      state = startGame(state);
+
+      const playerIds = Array.from(state.players.keys());
+
+      // Create creature and equipment
+      const creatureData = createMockCreature('Test Creature', 3, 3);
+      const creature = createCardInstance(creatureData, playerIds[0], playerIds[0]);
+      const equipData = createMockEquipment('Test Equipment');
+      const equipment = createCardInstance(equipData, playerIds[0], playerIds[0]);
+
+      // Attach equipment to creature
+      equipment.attachedToId = creature.id;
+
+      const battlefield = state.zones.get(`${playerIds[0]}-battlefield`)!;
+      state.cards.set(creature.id, creature);
+      state.cards.set(equipment.id, equipment);
+      state.zones.set(`${playerIds[0]}-battlefield`, {
+        ...battlefield,
+        cardIds: [creature.id, equipment.id],
+      });
+
+      // Remove creature from battlefield (simulate it leaving)
+      const updatedBattlefield = {
+        ...battlefield,
+        cardIds: [equipment.id], // Only equipment remains
+      };
+      state.zones.set(`${playerIds[0]}-battlefield`, updatedBattlefield);
+
+      const result = checkStateBasedActions(state);
+
+      expect(result.actionsPerformed).toBe(true);
+      // Equipment should be destroyed
+      const graveyard = result.state.zones.get(`${playerIds[0]}-graveyard`)!;
+      expect(graveyard.cardIds).toContain(equipment.id);
+    });
+
+    it('should not destroy Equipment attached to a creature', () => {
+      let state = createInitialGameState(['Alice', 'Bob'], 20, false);
+      state = startGame(state);
+
+      const playerIds = Array.from(state.players.keys());
+
+      // Create creature and equipment
+      const creatureData = createMockCreature('Test Creature', 3, 3);
+      const creature = createCardInstance(creatureData, playerIds[0], playerIds[0]);
+      const equipData = createMockEquipment('Test Equipment');
+      const equipment = createCardInstance(equipData, playerIds[0], playerIds[0]);
+
+      // Attach equipment to creature
+      equipment.attachedToId = creature.id;
+
+      const battlefield = state.zones.get(`${playerIds[0]}-battlefield`)!;
+      state.cards.set(creature.id, creature);
+      state.cards.set(equipment.id, equipment);
+      state.zones.set(`${playerIds[0]}-battlefield`, {
+        ...battlefield,
+        cardIds: [creature.id, equipment.id],
+      });
+
+      const result = checkStateBasedActions(state);
+
+      expect(result.actionsPerformed).toBe(false);
+      const battlefieldAfter = result.state.zones.get(`${playerIds[0]}-battlefield`)!;
+      expect(battlefieldAfter.cardIds).toContain(equipment.id);
+    });
+  });
+
+  describe('Multiple SBA Simultaneous Resolution', () => {
+    it('should handle multiple creatures dying simultaneously', () => {
+      let state = createInitialGameState(['Alice'], 20, false);
+      state = startGame(state);
+
+      const playerIds = Array.from(state.players.keys());
+
+      // Create multiple creatures
+      const creature1Data = createMockCreature('Creature 1', 2, 2);
+      const creature1 = createCardInstance(creature1Data, playerIds[0], playerIds[0]);
+      const creature2Data = createMockCreature('Creature 2', 3, 3);
+      const creature2 = createCardInstance(creature2Data, playerIds[0], playerIds[0]);
+      const creature3Data = createMockCreature('Creature 3', 4, 4);
+      const creature3 = createCardInstance(creature3Data, playerIds[0], playerIds[0]);
+
+      // Add creatures to battlefield with lethal damage
+      const battlefield = state.zones.get(`${playerIds[0]}-battlefield`)!;
+      creature1.damage = 2;
+      creature2.damage = 3;
+      creature3.damage = 1; // Not lethal
+
+      state.cards.set(creature1.id, creature1);
+      state.cards.set(creature2.id, creature2);
+      state.cards.set(creature3.id, creature3);
+      state.zones.set(`${playerIds[0]}-battlefield`, {
+        ...battlefield,
+        cardIds: [creature1.id, creature2.id, creature3.id],
+      });
+
+      const result = checkStateBasedActions(state);
+
+      expect(result.actionsPerformed).toBe(true);
+      const graveyard = result.state.zones.get(`${playerIds[0]}-graveyard`)!;
+      const battlefieldAfter = result.state.zones.get(`${playerIds[0]}-battlefield`)!;
+
+      // Creatures 1 and 2 should be destroyed, creature 3 should remain
+      expect(graveyard.cardIds).toContain(creature1.id);
+      expect(graveyard.cardIds).toContain(creature2.id);
+      expect(battlefieldAfter.cardIds).toContain(creature3.id);
+    });
+
+    it('should handle player loss and creature death simultaneously', () => {
+      let state = createInitialGameState(['Alice', 'Bob'], 20, false);
+      state = startGame(state);
+
+      const playerIds = Array.from(state.players.keys());
+      const aliceId = playerIds[0];
+
+      // Create a creature for Alice
+      const creatureData = createMockCreature('Test Creature', 3, 3);
+      const creature = createCardInstance(creatureData, aliceId, aliceId);
+
+      // Add creature to battlefield with lethal damage
+      const battlefield = state.zones.get(`${aliceId}-battlefield`)!;
+      creature.damage = 3;
+      state.cards.set(creature.id, creature);
+      state.zones.set(`${aliceId}-battlefield`, {
+        ...battlefield,
+        cardIds: [creature.id],
+      });
+
+      // Set Alice's life to 0
+      const alice = state.players.get(aliceId)!;
+      state.players.set(aliceId, {
+        ...alice,
+        life: 0,
+      });
+
+      const result = checkStateBasedActions(state);
+
+      expect(result.actionsPerformed).toBe(true);
+      const updatedAlice = result.state.players.get(aliceId);
+      expect(updatedAlice?.hasLost).toBe(true);
+
+      // Creature should also be destroyed
+      const graveyard = result.state.zones.get(`${aliceId}-graveyard`)!;
+      expect(graveyard.cardIds).toContain(creature.id);
     });
   });
 });
