@@ -166,9 +166,9 @@ To start development, take a look at `src/app/page.tsx` and `CLAUDE.md` for deve
 - [x] Concede and draw options
 
 #### 4.5 Alternative: Serverless Architecture Options
-- [ ] Evaluate Firebase Realtime Database for signaling/state
-- [ ] Consider WebSocket fallback for non-P2P scenarios
-- [ ] Hybrid approach: P2P gameplay with lightweight signaling
+- [x] Evaluate Firebase Realtime Database for signaling/state
+- [x] Consider WebSocket fallback for non-P2P scenarios
+- [x] Hybrid approach: P2P gameplay with lightweight signaling
 
 ---
 
@@ -180,7 +180,7 @@ To start development, take a look at `src/app/page.tsx` and `CLAUDE.md` for deve
 - [x] Card art display and high-res rendering
 - [x] Attack/block animations
 - [x] Spell casting effects
-- [ ] Damage indicators and floating combat text
+- [x] Damage indicators and floating combat text
 - [x] Sound effects and music
 - [x] Card sleeves and playmats customization
 
@@ -236,10 +236,7 @@ The codebase is well-structured with Next.js 15, TypeScript, and Genkit AI flows
 - Visual effects including animations, sounds, and card art
 - Social features including friends, trading, and replays
 
-Remaining work focuses on:
-- Damage indicators and floating combat text
-- Firebase Realtime Database evaluation
-- WebSocket fallback for non-P2P scenarios
+All planned features have been implemented. The project is feature-complete for v0.1.
 
 **Estimated Effort:**
 - Phase 1 (Game Engine): 60-80% of total effort
