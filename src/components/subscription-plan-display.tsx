@@ -385,7 +385,7 @@ export function SubscriptionPlanDisplay({ onAllDetected }: SubscriptionPlanDispl
             Detected {detection.plans.length} subscription(s) across your configured providers.
             {detection.primaryPlan && (
               <span className="block mt-1">
-                Primary: {detection.primaryPlan.planName} ({PROVIDER_NAMES[detection.primaryPlan.provider]})
+                Primary: {detection.primaryPlan.planName} ({PROVIDER_NAMES[detection.primaryPlan.provider as AIProvider]})
               </span>
             )}
           </AlertDescription>

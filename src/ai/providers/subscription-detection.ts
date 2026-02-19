@@ -19,6 +19,9 @@ import type {
   SubscriptionTier 
 } from './types';
 
+// Re-export SubscriptionDetection type for consumers
+export type { SubscriptionDetection } from './types';
+
 /**
  * Subscription plan definitions for each provider
  */
