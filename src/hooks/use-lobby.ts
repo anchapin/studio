@@ -6,10 +6,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { GameLobby, Player, HostGameConfig, LobbyStatus, PlayerStatus } from '@/lib/multiplayer-types';
+import { GameLobby, Player, HostGameConfig, LobbyStatus, PlayerStatus, TeamId, Team, TeamSettings } from '@/lib/multiplayer-types';
 import { lobbyManager } from '@/lib/lobby-manager';
 import { formatGameCode } from '@/lib/game-code-generator';
 import { validateDeckForLobby } from '@/lib/format-validator';
+import { getGameModeConfig } from '@/lib/game-mode';
 
 export interface UseLobbyReturn {
   lobby: GameLobby | null;
@@ -28,6 +29,16 @@ export interface UseLobbyReturn {
   closeLobby: () => void;
   getGameCode: () => string;
   validateDeckForFormat: (deck: any) => { isValid: boolean; errors: string[] };
+  // Team management
+  isTeamMode: boolean;
+  assignPlayerToTeam: (playerId: string, teamId: TeamId) => boolean;
+  autoAssignTeams: () => void;
+  getPlayerTeam: (playerId: string) => Team | undefined;
+  getTeamPlayers: (teamId: TeamId) => Player[];
+  areTeamsValid: boolean;
+  updateTeamSettings: (settings: Partial<TeamSettings>) => boolean;
+  updateTeamName: (teamId: TeamId, name: string) => boolean;
+  canAttackPlayer: (attackerId: string, defenderId: string) => boolean;
 }
 
 export function useLobby(): UseLobbyReturn {
@@ -141,6 +152,52 @@ export function useLobby(): UseLobbyReturn {
     };
   }, [lobby]);
 
+  // Team management functions
+  const isTeamMode = lobby ? getGameModeConfig(lobby.gameMode).isTeamMode : false;
+
+  const assignPlayerToTeam = useCallback((playerId: string, teamId: TeamId) => {
+    const success = lobbyManager.assignPlayerToTeam(playerId, teamId);
+    if (success) {
+      setLobby(lobbyManager.getCurrentLobby());
+    }
+    return success;
+  }, []);
+
+  const autoAssignTeams = useCallback(() => {
+    lobbyManager.autoAssignTeams();
+    setLobby(lobbyManager.getCurrentLobby());
+  }, []);
+
+  const getPlayerTeam = useCallback((playerId: string) => {
+    return lobbyManager.getPlayerTeam(playerId);
+  }, []);
+
+  const getTeamPlayers = useCallback((teamId: TeamId) => {
+    return lobbyManager.getTeamPlayers(teamId);
+  }, []);
+
+  const areTeamsValid = lobby ? lobbyManager.areTeamsValid() : true;
+
+  const updateTeamSettings = useCallback((settings: Partial<TeamSettings>) => {
+    const success = lobbyManager.updateTeamSettings(settings);
+    if (success) {
+      setLobby(lobbyManager.getCurrentLobby());
+    }
+    return success;
+  }, []);
+
+  const updateTeamName = useCallback((teamId: TeamId, name: string) => {
+    const success = lobbyManager.updateTeamName(teamId, name);
+    if (success) {
+      setLobby(lobbyManager.getCurrentLobby());
+    }
+    return success;
+  }, []);
+
+  const canAttackPlayer = useCallback((attackerId: string, defenderId: string) => {
+    return lobbyManager.canAttackPlayer(attackerId, defenderId);
+  }, []);
+
   return {
     lobby,
     isHost,
@@ -158,5 +215,15 @@ export function useLobby(): UseLobbyReturn {
     closeLobby,
     getGameCode,
     validateDeckForFormat,
+    // Team management
+    isTeamMode,
+    assignPlayerToTeam,
+    autoAssignTeams,
+    getPlayerTeam,
+    getTeamPlayers,
+    areTeamsValid,
+    updateTeamSettings,
+    updateTeamName,
+    canAttackPlayer,
   };
 }
