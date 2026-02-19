@@ -260,12 +260,15 @@ export class SignalingClient {
       const data = await response.json();
       
       // Update current session with new data
-      this.currentSession = {
-        ...this.currentSession,
-        ...data,
-      };
+      const session = this.currentSession;
+      if (session) {
+        this.currentSession = {
+          ...session,
+          ...data,
+        };
 
-      this.onSessionUpdate?.(this.currentSession);
+        this.onSessionUpdate?.(this.currentSession!);
+      }
     } catch (error) {
       console.error('[SignalingClient] Poll error:', error);
     }
