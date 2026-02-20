@@ -71,14 +71,6 @@ export interface DeckSuggestion {
 }
 
 // Card classification helpers
-const COLOR_KEYWORDS: Record<string, string[]> = {
-  'White': ['white', 'W', 'lifelink', 'lifetime', 'exalted'],
-  'Blue': ['blue', 'U', 'flying', 'countermagic', 'draw'],
-  'Black': ['black', 'B', 'deathtouch', 'drain', 'sacrifice'],
-  'Red': ['red', 'R', 'haste', 'burn', 'damage'],
-  'Green': ['green', 'G', 'trample', 'reach', 'growth'],
-};
-
 const RAMP_KEYWORDS = ['ramp', 'mana', 'rock', 'dork', 'cultivate', 'kodama', 'farseek', 'farseek', 'sol ring', 'arcane signet', 'darksteel ingot'];
 const REMOVAL_KEYWORDS = ['destroy', 'exile', 'damage', 'fight', 'kill', 'remove', 'counter', 'destroy target', 'exile target'];
 const CREATURE_KEYWORDS = ['creature', 'token'];

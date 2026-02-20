@@ -14,7 +14,6 @@
 
 import { z } from 'zod';
 import type { 
-  SequenceNumber, 
   PeerId,
   GameSyncMessage,
   SyncMessageType,

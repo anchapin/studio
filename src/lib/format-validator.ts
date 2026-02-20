@@ -10,7 +10,6 @@ import {
   getFormatRulesDescription,
   getFormatDisplayName,
   type Format,
-  type FormatValidationResult,
   type ValidationResult,
 } from './game-rules';
 import type { SavedDeck } from '@/app/actions';
