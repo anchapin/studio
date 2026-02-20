@@ -16,7 +16,6 @@ import {
   Target,
   Zap,
   MousePointer,
-  Eye,
   Shield,
   Crosshair,
   Info,

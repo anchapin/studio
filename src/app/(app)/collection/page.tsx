@@ -179,12 +179,8 @@ export default function CollectionPage() {
     removeCard,
     createCollection,
     deleteCollection,
-    renameCollection,
     importFromCSV,
     exportToCSV,
-    compareDeckWithCollection,
-    generateTradeList,
-    getCollectionStats,
   } = useCollection();
 
   const [searchQuery, setSearchQuery] = useState("");

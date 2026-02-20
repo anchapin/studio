@@ -164,7 +164,7 @@ export default function AchievementsPage() {
     achievement: Achievement;
     progress: { currentProgress: number; unlocked: boolean; unlockedAt?: number };
   }>>([]);
-  const [category, _setCategory] = useState<AchievementCategory | 'all'>('all');
+  const [category] = useState<AchievementCategory | 'all'>('all');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['games', 'wins']));
 
   useEffect(() => {
