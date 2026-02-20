@@ -19,7 +19,7 @@ import { z } from 'genkit';
 
 // Input schema for game analysis
 const GameAnalysisInputSchema = z.object({
-  replay: z.record(z.any()).describe("The game replay data with actions and outcomes"),
+  replay: z.record(z.unknown()).describe("The game replay data with actions and outcomes"),
   playerName: z.string().describe("The player to analyze (get advice for)"),
 });
 
@@ -50,7 +50,7 @@ const GameAnalysisOutputSchema = z.object({
 
 // Input schema for key moments identification
 const KeyMomentsInputSchema = z.object({
-  replay: z.record(z.any()).describe("The game replay data"),
+  replay: z.record(z.unknown()).describe("The game replay data"),
   playerName: z.string().describe("The player to focus on"),
 });
 
@@ -68,7 +68,7 @@ const KeyMomentsOutputSchema = z.object({
 
 // Input schema for quick tips
 const QuickTipsInputSchema = z.object({
-  replay: z.record(z.any()).describe("The game replay data"),
+  replay: z.record(z.unknown()).describe("The game replay data"),
   playerName: z.string().describe("The player to get tips for"),
 });
 

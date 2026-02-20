@@ -164,6 +164,15 @@ export interface CardOverrides {
 }
 
 /**
+ * Internal interface for card instance with effective colors
+ * Used by color-changing effects to communicate color changes
+ */
+interface CardInstanceWithEffectiveColors extends CardInstance {
+  /** Internal property set by color-changing effects */
+  _effectiveColors?: string[];
+}
+
+/**
  * Manages all continuous effects and applies them in correct order
  *
  * Implements the MTG layer system (CR 613) for continuous effects.
@@ -477,10 +486,10 @@ export class LayerSystem {
 
     for (const effect of colorEffects) {
       if (effect.canApply(modified)) {
-        const result = effect.apply(modified);
+        const result = effect.apply(modified) as CardInstanceWithEffectiveColors;
         // The effect should set colors directly via _effectiveColors
-        if ((result as any)._effectiveColors) {
-          colors = (result as any)._effectiveColors;
+        if (result._effectiveColors) {
+          colors = result._effectiveColors;
         }
       }
     }
