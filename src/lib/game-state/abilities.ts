@@ -14,11 +14,9 @@ import type {
   PlayerId,
   CardInstanceId,
   StackObject,
-  Zone,
 } from './types';
 import { Phase } from './types';
-import { moveCardBetweenZones } from './zones';
-import { parseOracleText, ParsedActivatedAbility, ParsedTriggeredAbility, AbilityType } from './oracle-text-parser';
+import { parseOracleText, ParsedActivatedAbility, ParsedTriggeredAbility } from './oracle-text-parser';
 import { spendMana } from './mana';
 import { destroyCard, discardCards } from './keyword-actions';
 
@@ -73,12 +71,20 @@ export function hasActivatedAbilities(card: { oracle_text?: string }): boolean {
   return card.oracle_text.includes(':');
 }
 
+// Card data interface for parsing
+interface CardDataForParsing {
+  oracle_text?: string;
+  type_line?: string;
+  name?: string;
+  mana_cost?: string;
+}
+
 /**
  * Parse a card's activated abilities
  */
-export function getActivatedAbilities(card: { oracle_text?: string; type_line?: string }): ParsedActivatedAbility[] {
+export function getActivatedAbilities(card: CardDataForParsing): ParsedActivatedAbility[] {
   if (!card.oracle_text) return [];
-  return parseOracleText(card as any).activatedAbilities;
+  return parseOracleText(card).activatedAbilities;
 }
 
 /**
@@ -93,9 +99,9 @@ export function hasTriggeredAbilities(card: { oracle_text?: string }): boolean {
 /**
  * Parse a card's triggered abilities
  */
-export function getTriggeredAbilities(card: { oracle_text?: string }): ParsedTriggeredAbility[] {
+export function getTriggeredAbilities(card: CardDataForParsing): ParsedTriggeredAbility[] {
   if (!card.oracle_text) return [];
-  return parseOracleText(card as any).triggeredAbilities;
+  return parseOracleText(card).triggeredAbilities;
 }
 
 /**
@@ -294,7 +300,7 @@ export function activateAbility(
       text: ability.effect,
       manaCost: card.cardData.mana_cost ?? null,
       targets: targets.map(t => ({
-        type: t.type as any,
+        type: t.type as 'card' | 'player' | 'zone',
         targetId: t.targetId,
         isValid: true,
       })),
