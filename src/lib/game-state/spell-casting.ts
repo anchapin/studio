@@ -475,7 +475,7 @@ export function getValidTargets(
  */
 export function validateSpellTargets(
   stackObject: StackObject,
-  state: GameState
+  _state: GameState
 ): boolean {
   // If no targets required, spell is valid
   if (stackObject.targets.length === 0) {

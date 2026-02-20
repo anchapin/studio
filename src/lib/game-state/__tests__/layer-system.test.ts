@@ -69,7 +69,7 @@ describe('Layer System', () => {
   describe('Layer Ordering', () => {
     it('should apply effects in correct layer order', () => {
       const creatureData = createMockCreature('Test Creature', 3, 3);
-      const _creature = createCardInstance(creatureData, 'player1', 'player1');
+      createCardInstance(creatureData, 'player1', 'player1');
 
       // Register effects in reverse order to test sorting
       const ptEffect = createPowerToughnessModifyEffect(
@@ -132,7 +132,7 @@ describe('Layer System', () => {
 
     it('should apply Layer 7 effects in correct sublayer order', () => {
       const creatureData = createMockCreature('Test Creature', 3, 3);
-      const _creature = createCardInstance(creatureData, 'player1', 'player1');
+      createCardInstance(creatureData, 'player1', 'player1');
 
       // Register effects in reverse sublayer order
       const modifyEffect = createPowerToughnessModifyEffect(
@@ -182,7 +182,7 @@ describe('Layer System', () => {
   describe('Timestamp Ordering', () => {
     it('should apply effects with earlier timestamp first within same layer', () => {
       const creatureData = createMockCreature('Test Creature', 3, 3);
-      const _creature = createCardInstance(creatureData, 'player1', 'player1');
+      createCardInstance(creatureData, 'player1', 'player1');
 
       // Create effects with different timestamps
       const earlierEffect = createPowerToughnessModifyEffect(
@@ -832,7 +832,7 @@ describe('Layer System', () => {
   describe('Dependency Handling', () => {
     it('should respect effect dependencies', () => {
       const creatureData = createMockCreature('Test Creature', 3, 3);
-      const _creature = createCardInstance(creatureData, 'player1', 'player1');
+      createCardInstance(creatureData, 'player1', 'player1');
 
       const effectA = createPowerToughnessModifyEffect(
         'sourceA',
@@ -873,7 +873,7 @@ describe('Layer System', () => {
   describe('Effect Removal', () => {
     it('should remove effects from a source', () => {
       const creatureData = createMockCreature('Test Creature', 3, 3);
-      const _creature = createCardInstance(creatureData, 'player1', 'player1');
+      createCardInstance(creatureData, 'player1', 'player1');
 
       const effect1 = createPowerToughnessModifyEffect(
         'source1',
