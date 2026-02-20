@@ -65,6 +65,10 @@ export function addMana(
 /**
  * Spend mana from a player's mana pool
  * Returns whether the payment was successful
+ * 
+ * Generic mana costs can be paid with any type of mana (colored, colorless, or generic).
+ * Colored mana costs must be paid with the specific color.
+ * Colorless mana costs must be paid with colorless mana (not colored).
  */
 export function spendMana(
   state: GameState,
@@ -78,96 +82,85 @@ export function spendMana(
 
   const pool = player.manaPool;
 
-  // Check if player has enough mana
+  // Check if player has enough colored mana (specific color requirements)
   if (
-    pool.colorless < (mana.colorless ?? 0) ||
     pool.white < (mana.white ?? 0) ||
     pool.blue < (mana.blue ?? 0) ||
     pool.black < (mana.black ?? 0) ||
     pool.red < (mana.red ?? 0) ||
-    pool.green < (mana.green ?? 0) ||
-    pool.generic < (mana.generic ?? 0)
+    pool.green < (mana.green ?? 0)
   ) {
     return { success: false, state };
   }
 
-  // Calculate total colored mana available
-  const totalColored =
-    pool.white + pool.blue + pool.black + pool.red + pool.green;
-  const neededColored =
-    (mana.white ?? 0) +
-    (mana.blue ?? 0) +
-    (mana.black ?? 0) +
-    (mana.red ?? 0) +
-    (mana.green ?? 0);
-
-  // Check if we can use colored/colorless mana to pay generic costs
-  // Generic mana can be paid with any color or colorless
-  const remainingGeneric = pool.generic;
-  const remainingColored = totalColored - neededColored;
-  const remainingColorless = pool.colorless - (mana.colorless ?? 0);
-  
-  if (remainingGeneric + remainingColored + remainingColorless < (mana.generic ?? 0)) {
+  // Check if player has enough colorless mana (colorless is specific, like colored)
+  if (pool.colorless < (mana.colorless ?? 0)) {
     return { success: false, state };
   }
 
-  // Calculate how much generic we need to pay
+  // Calculate total mana available for generic costs
+  // Generic can be paid with: generic pool, colored mana, or colorless mana
+  const totalColored = pool.white + pool.blue + pool.black + pool.red + pool.green;
+  const neededColored = (mana.white ?? 0) + (mana.blue ?? 0) + (mana.black ?? 0) + (mana.red ?? 0) + (mana.green ?? 0);
+  const availableForGeneric = pool.generic + (totalColored - neededColored) + (pool.colorless - (mana.colorless ?? 0));
+  
+  if (availableForGeneric < (mana.generic ?? 0)) {
+    return { success: false, state };
+  }
+
+  // Calculate deductions
+  let whiteRemaining = pool.white - (mana.white ?? 0);
+  let blueRemaining = pool.blue - (mana.blue ?? 0);
+  let blackRemaining = pool.black - (mana.black ?? 0);
+  let redRemaining = pool.red - (mana.red ?? 0);
+  let greenRemaining = pool.green - (mana.green ?? 0);
+  let colorlessRemaining = pool.colorless - (mana.colorless ?? 0);
+  let genericRemaining = pool.generic;
+
+  // Pay generic costs - first from generic pool, then from colored/colorless
   let genericToPay = mana.generic ?? 0;
   
-  // First use generic pool
-  const genericFromGeneric = Math.min(pool.generic, genericToPay);
-  genericToPay -= genericFromGeneric;
+  // First use generic pool mana
+  const fromGeneric = Math.min(genericRemaining, genericToPay);
+  genericRemaining -= fromGeneric;
+  genericToPay -= fromGeneric;
   
-  // Then use colored mana (can pay for generic)
-  const extraColoredAvailable = totalColored - neededColored;
-  const genericFromColored = Math.min(extraColoredAvailable, genericToPay);
-  genericToPay -= genericFromColored;
+  // Then use colorless mana for remaining generic
+  const fromColorless = Math.min(colorlessRemaining, genericToPay);
+  colorlessRemaining -= fromColorless;
+  genericToPay -= fromColorless;
   
-  // Finally use colorless (can pay for generic)
-  const genericFromColorless = Math.min(pool.colorless - (mana.colorless ?? 0), genericToPay);
-  genericToPay -= genericFromColorless;
+  // Finally use colored mana for remaining generic (any color can pay generic)
+  // Use colored mana in order: white, blue, black, red, green
+  const useColoredForGeneric = (amount: number, available: number): { used: number; remaining: number } => {
+    const used = Math.min(available, amount);
+    return { used, remaining: available - used };
+  };
   
-  // Now calculate actual deductions with proper prioritization
-  // Deduct colored first for colored requirements
-  let whiteToDeduct = mana.white ?? 0;
-  let blueToDeduct = mana.blue ?? 0;
-  let blackToDeduct = mana.black ?? 0;
-  let redToDeduct = mana.red ?? 0;
-  let greenToDeduct = mana.green ?? 0;
-  let colorlessToDeduct = mana.colorless ?? 0;
-  
-  // If we used colored for generic, deduct from colored pools proportionally
-  if (genericFromColored > 0) {
-    // Deduct proportionally from available colored
-    const coloredAvailable = extraColoredAvailable;
-    if (coloredAvailable > 0) {
-      // Deduct from whichever colors have excess
-      const excessWhite = Math.max(0, pool.white - (mana.white ?? 0));
-      const excessBlue = Math.max(0, pool.blue - (mana.blue ?? 0));
-      const excessBlack = Math.max(0, pool.black - (mana.black ?? 0));
-      const excessRed = Math.max(0, pool.red - (mana.red ?? 0));
-      const excessGreen = Math.max(0, pool.green - (mana.green ?? 0));
-      const totalExcess = excessWhite + excessBlue + excessBlack + excessRed + excessGreen;
-      
-      if (totalExcess > 0) {
-        const whiteDeduct = Math.floor((excessWhite / totalExcess) * genericFromColored);
-        const blueDeduct = Math.floor((excessBlue / totalExcess) * genericFromColored);
-        const blackDeduct = Math.floor((excessBlack / totalExcess) * genericFromColored);
-        const redDeduct = Math.floor((excessRed / totalExcess) * genericFromColored);
-        const greenDeduct = Math.floor((excessGreen / totalExcess) * genericFromColored);
-        
-        whiteToDeduct += whiteDeduct;
-        blueToDeduct += blueDeduct;
-        blackToDeduct += blackDeduct;
-        redToDeduct += redDeduct;
-        greenToDeduct += greenDeduct;
-      }
-    }
+  if (genericToPay > 0 && whiteRemaining > 0) {
+    const result = useColoredForGeneric(genericToPay, whiteRemaining);
+    whiteRemaining = result.remaining;
+    genericToPay -= result.used;
   }
-  
-  // If we used colorless for generic, add to colorless deduction
-  if (genericFromColorless > 0) {
-    colorlessToDeduct += genericFromColorless;
+  if (genericToPay > 0 && blueRemaining > 0) {
+    const result = useColoredForGeneric(genericToPay, blueRemaining);
+    blueRemaining = result.remaining;
+    genericToPay -= result.used;
+  }
+  if (genericToPay > 0 && blackRemaining > 0) {
+    const result = useColoredForGeneric(genericToPay, blackRemaining);
+    blackRemaining = result.remaining;
+    genericToPay -= result.used;
+  }
+  if (genericToPay > 0 && redRemaining > 0) {
+    const result = useColoredForGeneric(genericToPay, redRemaining);
+    redRemaining = result.remaining;
+    genericToPay -= result.used;
+  }
+  if (genericToPay > 0 && greenRemaining > 0) {
+    const result = useColoredForGeneric(genericToPay, greenRemaining);
+    greenRemaining = result.remaining;
+    genericToPay -= result.used;
   }
 
   // Spend the mana
@@ -175,13 +168,13 @@ export function spendMana(
   const updatedPlayer = {
     ...player,
     manaPool: {
-      colorless: pool.colorless - colorlessToDeduct,
-      white: pool.white - whiteToDeduct,
-      blue: pool.blue - blueToDeduct,
-      black: pool.black - blackToDeduct,
-      red: pool.red - redToDeduct,
-      green: pool.green - greenToDeduct,
-      generic: pool.generic - genericFromGeneric,
+      colorless: colorlessRemaining,
+      white: whiteRemaining,
+      blue: blueRemaining,
+      black: blackRemaining,
+      red: redRemaining,
+      green: greenRemaining,
+      generic: genericRemaining,
     },
   };
   updatedPlayers.set(playerId, updatedPlayer);
