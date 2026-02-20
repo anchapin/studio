@@ -1060,7 +1060,8 @@ describe('State-Based Actions', () => {
 
     it('should handle planeswalkers without loyalty field', () => {
       const pwData = createMockPlaneswalker('Test Planeswalker', 0);
-      pwData.loyalty = undefined as any;
+      // Delete the loyalty property to simulate a planeswalker without loyalty
+      delete (pwData as Partial<ScryfallCard>).loyalty;
       const planeswalker = createCardInstance(pwData, 'player1', 'player1');
 
       const result = initializePlaneswalkerLoyalty(planeswalker);

@@ -21,6 +21,7 @@ import type {
   CardInstanceId,
   PlayerId,
   Zone,
+  ScryfallCard,
 } from './types';
 import {
   createToken,
@@ -439,7 +440,7 @@ export function discardCards(
  */
 export function createTokenCard(
   state: GameState,
-  tokenData: any, // ScryfallCard for token
+  tokenData: ScryfallCard,
   controllerId: PlayerId,
   ownerId: PlayerId,
   count: number = 1
