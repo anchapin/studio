@@ -295,7 +295,7 @@ export class WebSocketConnection {
   /**
    * Handle disconnection
    */
-  private handleDisconnection(event: CloseEvent): void {
+  private handleDisconnection(_event: CloseEvent): void {
     this.stopPingInterval();
     
     if (this.config.autoReconnect && this.reconnectAttempts < this.config.maxReconnectAttempts) {
