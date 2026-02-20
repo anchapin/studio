@@ -17,7 +17,6 @@ import {
   Filter, 
   Clock, 
   Users, 
-  Trophy, 
   RotateCcw,
   Download,
   Upload,
@@ -43,16 +42,6 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { 
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   DropdownMenu,
@@ -67,7 +56,6 @@ import {
   getStatusDisplay 
 } from "@/lib/saved-games";
 import { 
-  generateShareableURL, 
   copyShareableLink,
   exportReplayToFile,
   canShareViaURL 

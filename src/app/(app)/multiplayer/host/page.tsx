@@ -15,15 +15,13 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Copy, Check, Users, Settings, Play, X, Crown, Clock, Eye, Info } from 'lucide-react';
+import { Copy, Check, Users, Play, X, Crown, Clock, Eye, Info } from 'lucide-react';
 import { useLobby } from '@/hooks/use-lobby';
-import { HostGameConfig, PlayerStatus, GameMode } from '@/lib/multiplayer-types';
+import { HostGameConfig, PlayerStatus } from '@/lib/multiplayer-types';
 import { FormatRulesDisplay } from '@/components/format-rules-display';
 import { DeckSelectorWithValidation } from '@/components/deck-selector-with-validation';
 import { TeamAssignment } from '@/components/team-assignment';
-import { useLocalStorage } from '@/hooks/use-local-storage';
 import { SavedDeck } from '@/app/actions';
-import { GAME_MODES } from '@/lib/game-mode';
 
 export default function HostLobbyPage() {
   const { 
@@ -59,11 +57,9 @@ export default function HostLobbyPage() {
   const [timerMinutes, setTimerMinutes] = useState(30);
   const [isPublic, setIsPublic] = useState(false);
   const [selectedDeck, setSelectedDeck] = useState<SavedDeck | null>(null);
-  const [deckValidation, setDeckValidation] = useState<{ isValid: boolean; errors: string[] }>({ isValid: true, errors: [] });
 
   // UI state
   const [copied, setCopied] = useState(false);
-  const [showSettings, setShowSettings] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(true);
 
   const gameCode = getGameCode();
@@ -97,7 +93,6 @@ export default function HostLobbyPage() {
 
     createLobby(config, hostName);
     setShowCreateForm(false);
-    setShowSettings(false);
 
     // Auto-select first valid deck if available
     const [savedDecks] = getStoredDecks();
@@ -120,7 +115,7 @@ export default function HostLobbyPage() {
   const handleDeckSelect = (deck: SavedDeck, validation?: { isValid: boolean; errors: string[] }) => {
     setSelectedDeck(deck);
     const deckValidationResult = validation || validateDeckForFormat(deck);
-    setDeckValidation(deckValidationResult);
+    // Update player deck in lobby with validation result
 
     // Update player deck in lobby
     if (lobby) {
@@ -213,7 +208,7 @@ export default function HostLobbyPage() {
               {/* Game Format */}
               <div className="space-y-2">
                 <Label htmlFor="format">Format *</Label>
-                <Select value={gameFormat} onValueChange={(value: any) => setGameFormat(value)}>
+                <Select value={gameFormat} onValueChange={(value: typeof gameFormat) => setGameFormat(value)}>
                   <SelectTrigger id="format">
                     <SelectValue />
                   </SelectTrigger>
@@ -232,7 +227,7 @@ export default function HostLobbyPage() {
               {/* Player Count */}
               <div className="space-y-2">
                 <Label htmlFor="players">Max Players</Label>
-                <Select value={playerCount} onValueChange={(value: any) => setPlayerCount(value)}>
+                <Select value={playerCount} onValueChange={(value: typeof playerCount) => setPlayerCount(value)}>
                   <SelectTrigger id="players">
                     <SelectValue />
                   </SelectTrigger>
