@@ -20,8 +20,6 @@ import {
   Shield,
   AlertTriangle,
   Check,
-  X,
-  Info,
   ArrowRight,
   GripVertical,
   RotateCcw,
