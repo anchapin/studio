@@ -5,7 +5,6 @@
 
 import {
   formatRules,
-  formatRuleDescriptions,
   validateDeckFormat,
   validateSideboard,
   isDeckLegal,
@@ -20,7 +19,6 @@ import {
   banLists,
   vintageRestrictedList,
   type Format,
-  type FormatValidationResult,
 } from "../game-rules";
 
 describe("Game Rules - Format Rules", () => {

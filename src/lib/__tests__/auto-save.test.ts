@@ -11,7 +11,6 @@ import {
   isTriggerEnabled,
   toggleTrigger,
   DEFAULT_AUTO_SAVE_CONFIG,
-  type AutoSaveTrigger,
 } from '../auto-save-config';
 
 // Mock localStorage

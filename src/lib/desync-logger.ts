@@ -9,7 +9,6 @@ import type {
   PeerId,
   SequenceNumber,
 } from './game-state/deterministic-sync';
-import type { GameState } from './game-state/types';
 
 /**
  * Desync event record

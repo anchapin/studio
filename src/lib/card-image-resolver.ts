@@ -59,7 +59,7 @@ export function isCustomImagesEnabled(): boolean {
 export function resolveCardImage(
   card: ScryfallCard, 
   imageDir?: string | null,
-  size: 'small' | 'normal' | 'large' = 'normal'
+  _size: 'small' | 'normal' | 'large' = 'normal'
 ): string | null {
   // Use provided directory or get from storage
   const dir = imageDir ?? getImageDirectory();
