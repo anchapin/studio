@@ -312,9 +312,9 @@ export class CombatDecisionTree {
     opponents: PlayerState[]
   ): 'aggressive' | 'moderate' | 'defensive' {
     const minOpponentLife = Math.min(...opponents.map((o) => o.life));
-    const _lifeTotal = aiPlayer.life;
+    const lifeTotal = aiPlayer.life;
     const creatureCount = aiPlayer.battlefield.filter(
-      (p) => p.type === 'creature'
+      (p: Permanent) => p.type === 'creature'
     ).length;
     const avgOpponentCreatures =
       opponents.reduce(
@@ -323,7 +323,7 @@ export class CombatDecisionTree {
       ) / opponents.length;
 
     // Low life: play defensively
-    if (_lifeTotal <= this.config.lifeThreshold) {
+    if (lifeTotal <= this.config.lifeThreshold) {
       return 'defensive';
     }
 
@@ -918,7 +918,7 @@ export class CombatDecisionTree {
     const tricks: CombatTrick[] = [];
 
     // Get combat-relevant cards from hand
-    const combatCards = aiPlayer.hand.filter(card => 
+    const combatCards = aiPlayer.hand.filter((card: HandCard) => 
       this.isCombatTrickCard(card)
     );
 
@@ -1084,7 +1084,7 @@ export class CombatDecisionTree {
   private findTrickTargets(
     parsed: ParsedCombatTrick,
     attacks: AttackDecision[],
-    aiPlayer: PlayerState
+    _aiPlayer: PlayerState
   ): { targetId: string; targetType: 'attacker' | 'blocker' | 'none'; value: number } | null {
     // For destroy/exile effects, find valuable targets
     if (parsed.destroyTarget || parsed.exileTarget) {
@@ -1154,7 +1154,7 @@ export class CombatDecisionTree {
   private calculateTrickValue(
     parsed: ParsedCombatTrick,
     target: { targetId: string; targetType: 'attacker' | 'blocker' | 'none'; value: number },
-    _aiPlayer: PlayerState
+    __aiPlayer: PlayerState
   ): number {
     let value = 0;
 
