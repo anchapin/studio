@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { cn } from '@/lib/utils';
-import { resolveCardImageWithFallback, getCardBackImage, getImageDirectory } from '@/lib/card-image-resolver';
+import { resolveCardImageWithFallback, getCardBackImage } from '@/lib/card-image-resolver';
 
 /**
  * Card Art Display Component
