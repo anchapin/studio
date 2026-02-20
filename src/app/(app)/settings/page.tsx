@@ -299,7 +299,6 @@ export default function SettingsPage() {
   });
   
   // State for saving
-  const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   
   // State for provider selection

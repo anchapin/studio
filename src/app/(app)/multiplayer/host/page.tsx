@@ -114,8 +114,10 @@ export default function HostLobbyPage() {
   // Handle deck selection with validation
   const handleDeckSelect = (deck: SavedDeck, validation?: { isValid: boolean; errors: string[] }) => {
     setSelectedDeck(deck);
-    const deckValidationResult = validation || validateDeckForFormat(deck);
-    // Update player deck in lobby with validation result
+    // Validation is handled by the deck selector component
+    if (!validation) {
+      validateDeckForFormat(deck);
+    }
 
     // Update player deck in lobby
     if (lobby) {

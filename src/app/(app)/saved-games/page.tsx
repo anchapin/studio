@@ -78,11 +78,9 @@ export default function SavedGamesPage() {
   const { toast } = useToast();
   
   const [games, setGames] = useState<SavedGame[]>([]);
-  const [filteredGames, setFilteredGames] = useState<SavedGame[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [formatFilter, setFormatFilter] = useState<string>("all");
-  const [deleteTarget, setDeleteTarget] = useState<SavedGame | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [fileInputRef, setFileInputRef] = useState<HTMLInputElement | null>(null);
 
@@ -91,13 +89,23 @@ export default function SavedGamesPage() {
     loadGames();
   }, []);
 
-  // Apply filters when games or filter criteria change
-  useEffect(() => {
-    let filtered = games;
+  function loadGames() {
+    setIsLoading(true);
+    const allGames = savedGamesManager.getAllSavedGames();
+    setGames(allGames);
+    setIsLoading(false);
+  }
+
+  // Get filtered games
+  const getFilteredGames = (gameList: SavedGame[]) => {
+    let filtered = gameList;
 
     // Apply search
     if (searchQuery.trim()) {
-      filtered = savedGamesManager.searchGames(searchQuery);
+      filtered = filtered.filter(g => 
+        g.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        g.playerNames.some(p => p.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
     }
 
     // Apply status filter
@@ -110,16 +118,8 @@ export default function SavedGamesPage() {
       filtered = filtered.filter(g => g.format === formatFilter);
     }
 
-    setFilteredGames(filtered);
-  }, [games, searchQuery, statusFilter, formatFilter]);
-
-  function loadGames() {
-    setIsLoading(true);
-    const allGames = savedGamesManager.getAllSavedGames();
-    setGames(allGames);
-    setFilteredGames(allGames);
-    setIsLoading(false);
-  }
+    return filtered;
+  };
 
   function handleLoadGame(game: SavedGame) {
     // Store the game ID to load in session storage
@@ -132,19 +132,15 @@ export default function SavedGamesPage() {
     router.push('/single-player');
   }
 
-  function handleDeleteGame() {
-    if (!deleteTarget) return;
-    
-    const success = savedGamesManager.deleteGame(deleteTarget.id);
+  function handleDeleteGame(game: SavedGame) {
+    const success = savedGamesManager.deleteGame(game.id);
     if (success) {
       toast({
         title: "Game Deleted",
-        description: `"${deleteTarget.name}" has been deleted.`,
+        description: `"${game.name}" has been deleted.`,
       });
       loadGames();
     }
-    
-    setDeleteTarget(null);
   }
 
   function handleExportGame(game: SavedGame) {
@@ -217,7 +213,7 @@ export default function SavedGamesPage() {
           description: "Replay file downloaded. It's too large for URL sharing.",
         });
       }
-    } catch (error) {
+    } catch {
       toast({
         variant: "destructive",
         title: "Share Failed",
@@ -294,6 +290,8 @@ export default function SavedGamesPage() {
   );
 
   function renderGameList(gameList: SavedGame[]) {
+    const filteredGames = getFilteredGames(gameList);
+    
     return (
       <>
         {/* Filters */}
@@ -388,12 +386,12 @@ export default function SavedGamesPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center justify-between">
-              <span>Games ({gameList.length})</span>
+              <span>Games ({filteredGames.length})</span>
             </CardTitle>
             <CardDescription>
-              {gameList.length === 0
+              {filteredGames.length === 0
                 ? "No saved games found."
-                : `${gameList.length} game${gameList.length !== 1 ? 's' : ''}`
+                : `${filteredGames.length} game${filteredGames.length !== 1 ? 's' : ''}`
               }
             </CardDescription>
           </CardHeader>
@@ -403,7 +401,7 @@ export default function SavedGamesPage() {
                 <RotateCcw className="w-8 h-8 mx-auto mb-4 animate-spin" />
                 <p>Loading games...</p>
               </div>
-            ) : gameList.length === 0 ? (
+            ) : filteredGames.length === 0 ? (
               <div className="text-center py-12">
                 <Save className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
                 <h3 className="text-lg font-semibold mb-2">No Games Found</h3>
@@ -442,7 +440,7 @@ export default function SavedGamesPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {gameList.map((game) => (
+                    {filteredGames.map((game) => (
                       <TableRow key={game.id}>
                         <TableCell>
                           <div className="font-medium">{game.name}</div>
@@ -515,7 +513,7 @@ export default function SavedGamesPage() {
                                   </DropdownMenuItem>
                                 )}
                                 <DropdownMenuItem 
-                                  onClick={() => setDeleteTarget(game)}
+                                  onClick={() => handleDeleteGame(game)}
                                   className="text-destructive"
                                 >
                                   <Trash2 className="w-4 h-4 mr-2" />

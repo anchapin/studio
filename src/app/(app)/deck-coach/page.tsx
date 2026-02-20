@@ -28,7 +28,7 @@ export default function DeckCoachPage() {
   const [originalDeckCards, setOriginalDeckCards] = useState<DeckCard[] | null>(null);
   const [isPending, startTransition] = useTransition();
   const [analysisType, setAnalysisType] = useState<"review" | "meta">("review");
-  const [savedDecks, setSavedDecks] = useLocalStorage<SavedDeck[]>('saved-decks', []);
+  const [, setSavedDecks] = useLocalStorage<SavedDeck[]>('saved-decks', []);
   const { toast } = useToast();
 
   const handleAnalyzeDeck = (type: "review" | "meta") => {

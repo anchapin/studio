@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { RefreshCw, Search, Users, Clock, Lock, Eye, Gamepad2, Crown } from 'lucide-react';
+import { RefreshCw, Search, Users, Lock, Eye, Gamepad2, Crown } from 'lucide-react';
 import { publicLobbyBrowser, PublicGameInfo } from '@/lib/public-lobby-browser';
 import { GameFormat, PlayerCount } from '@/lib/multiplayer-types';
 
