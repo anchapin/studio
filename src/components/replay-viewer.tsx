@@ -27,11 +27,8 @@ import type { Replay } from '@/lib/game-state/replay';
 // Playback speed options
 const PLAYBACK_SPEEDS = [0.5, 1, 1.5, 2, 4] as const;
 
-// Game state type for replay viewer
-interface ReplayGameState {
-  turn?: { turnNumber: number };
-  [key: string]: unknown;
-}
+// Game state type for replay viewer - use the actual GameState type
+import type { GameState as ReplayGameState } from '@/lib/game-state/types';
 
 // Replay viewer props
 export interface ReplayViewerProps {

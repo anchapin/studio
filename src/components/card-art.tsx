@@ -28,6 +28,7 @@ export interface CardArtProps {
     set?: string;
     collector_number?: string;
     name: string;
+    color_identity?: string[];
   };
   /** Image size variant */
   size?: 'thumbnail' | 'small' | 'normal' | 'large' | 'full';

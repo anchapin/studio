@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PlayerState, PlayerCount, ZoneType, TeamState } from "@/types/game";
+import { PlayerState, PlayerCount, ZoneType, TeamState, CardState } from "@/types/game";
 import { HandDisplay } from "@/components/hand-display";
 import { DamageOverlay, useDamageEvents, DamageEvent } from "@/components/damage-indicator";
 import {
@@ -75,11 +75,8 @@ interface PlayerAreaProps {
   isLocalPlayer?: boolean;
 }
 
-// Card type for zone display
-interface ZoneCard {
-  id: string;
-  [key: string]: unknown;
-}
+// Card type for zone display - use CardState from game types
+type ZoneCard = CardState;
 
 // Memoized ZoneDisplay component for performance optimization
 const ZoneDisplay = memo(function ZoneDisplay({
