@@ -71,13 +71,11 @@ export function hasActivatedAbilities(card: { oracle_text?: string }): boolean {
   return card.oracle_text.includes(':');
 }
 
-// Card data interface for parsing
-interface CardDataForParsing {
-  oracle_text?: string;
-  type_line?: string;
-  name?: string;
-  mana_cost?: string;
-}
+// Card data interface for parsing - extends ScryfallCard with optional fields
+import type { ScryfallCard } from '@/app/actions';
+
+// Use ScryfallCard directly for parsing since parseOracleText requires it
+type CardDataForParsing = ScryfallCard;
 
 /**
  * Parse a card's activated abilities
