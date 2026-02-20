@@ -371,7 +371,7 @@ describe('Spell Casting - Stack Resolution', () => {
       state.stack = [];
 
       const castResult = castSpell(state, aliceId, cardId);
-      let stateWithStack = castResult.state;
+      const stateWithStack = castResult.state;
       
       // Resolve the spell
       const result = resolveTopOfStack(stateWithStack);
@@ -393,7 +393,7 @@ describe('Spell Casting - Stack Resolution', () => {
       state.stack = [];
 
       const castResult = castSpell(state, aliceId, cardId);
-      let stateWithStack = castResult.state;
+      const stateWithStack = castResult.state;
       
       // Resolve the spell
       const result = resolveTopOfStack(stateWithStack);
@@ -419,7 +419,9 @@ describe('Spell Casting - Stack Resolution', () => {
     });
 
     it('should resolve spells in LIFO order', () => {
-      const { state, aliceId } = setupGameWithCardInHand(createMockInstant('Spell 1'));
+      const setup = setupGameWithCardInHand(createMockInstant('Spell 1'));
+      let state = setup.state;
+      const aliceId = setup.aliceId;
       
       // Add two spells to hand
       const spell1Data = createMockInstant('Spell 1');
@@ -441,10 +443,10 @@ describe('Spell Casting - Stack Resolution', () => {
       state.stack = [];
 
       // Cast both spells
-      let result1 = castSpell(state, aliceId, spell1.id);
+      const result1 = castSpell(state, aliceId, spell1.id);
       // Pass priority back to cast second (simulating response)
       result1.state.priorityPlayerId = aliceId;
-      let result2 = castSpell(result1.state, aliceId, spell2.id);
+      const result2 = castSpell(result1.state, aliceId, spell2.id);
       
       expect(result2.state.stack.length).toBe(2);
       
@@ -773,7 +775,9 @@ describe('Spell Casting - Edge Cases', () => {
   });
 
   it('should handle multiple spells on stack resolving correctly', () => {
-    const { state, aliceId } = setupGameWithCardInHand(createMockInstant('Spell'));
+    const setup = setupGameWithCardInHand(createMockInstant('Spell'));
+    let state = setup.state;
+    const aliceId = setup.aliceId;
     
     // Create multiple spells
     const spell1Data = createMockInstant('Spell 1');
