@@ -282,7 +282,7 @@ export function playLand(
   }
 
   // Verify the card is in player's hand
-  const handZone = state.zones.get(`hand-${playerId}`);
+  const handZone = state.zones.get(`${playerId}-hand`);
   if (!handZone || !handZone.cardIds.includes(cardId)) {
     return { success: false, state };
   }
@@ -299,7 +299,7 @@ export function playLand(
   }
 
   // Get the battlefield zone
-  const battlefieldZone = state.zones.get(`battlefield-${playerId}`);
+  const battlefieldZone = state.zones.get(`${playerId}-battlefield`);
   if (!battlefieldZone) {
     return { success: false, state };
   }
@@ -309,8 +309,8 @@ export function playLand(
   
   // Update zones
   const updatedZones = new Map(state.zones);
-  updatedZones.set(`hand-${playerId}`, moved.from);
-  updatedZones.set(`battlefield-${playerId}`, moved.to);
+  updatedZones.set(`${playerId}-hand`, moved.from);
+  updatedZones.set(`${playerId}-battlefield`, moved.to);
 
   // Increment lands played this turn
   const player = state.players.get(playerId);
