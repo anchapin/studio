@@ -171,7 +171,7 @@ export default function BrowseGamesPage() {
             {/* Format Filter */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Format</label>
-              <Select value={formatFilter} onValueChange={(value: any) => setFormatFilter(value)}>
+              <Select value={formatFilter} onValueChange={(value: GameFormat | 'all') => setFormatFilter(value)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -194,7 +194,7 @@ export default function BrowseGamesPage() {
                 <Users className="w-4 h-4" />
                 Players
               </label>
-              <Select value={playerCountFilter} onValueChange={(value: any) => setPlayerCountFilter(value)}>
+              <Select value={playerCountFilter} onValueChange={(value: PlayerCount | 'all') => setPlayerCountFilter(value)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
