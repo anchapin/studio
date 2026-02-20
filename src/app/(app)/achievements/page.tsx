@@ -5,7 +5,6 @@ import {
   Trophy, 
   Star, 
   Lock, 
-  Unlock,
   Play,
   Shield,
   Boxes,
@@ -35,7 +34,6 @@ import {
   achievementManager, 
   type Achievement, 
   type AchievementCategory,
-  type AchievementRarity,
   ACHIEVEMENTS,
   RARITY_COLORS,
   getTotalPossiblePoints 
@@ -44,7 +42,7 @@ import {
 /**
  * Icon mapping for achievements
  */
-const ICON_MAP: Record<string, React.ComponentType<any>> = {
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Play,
   Gamepad2,
   Trophy,
@@ -80,11 +78,9 @@ function getIconComponent(iconName: string) {
 function AchievementCard({ 
   achievement, 
   progress,
-  showDetails = false 
 }: { 
   achievement: Achievement; 
   progress?: { currentProgress: number; unlocked: boolean; unlockedAt?: number };
-  showDetails?: boolean;
 }) {
   const Icon = getIconComponent(achievement.icon);
   const isUnlocked = progress?.unlocked || false;
@@ -168,7 +164,7 @@ export default function AchievementsPage() {
     achievement: Achievement;
     progress: { currentProgress: number; unlocked: boolean; unlockedAt?: number };
   }>>([]);
-  const [category, setCategory] = useState<AchievementCategory | 'all'>('all');
+  const [category, _setCategory] = useState<AchievementCategory | 'all'>('all');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['games', 'wins']));
 
   useEffect(() => {

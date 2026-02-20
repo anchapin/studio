@@ -7,10 +7,9 @@
  * Reference: CR 106 - Mana, CR 305 - Lands
  */
 
-import type { GameState, PlayerId, CardInstanceId, ManaPool, ZoneType } from "./types";
+import type { GameState, PlayerId, CardInstanceId, ManaPool } from "./types";
 import { Phase } from "./types";
 import { moveCardBetweenZones } from "./zones";
-import { passPriority } from "./game-state";
 
 /**
  * Create an empty mana pool
@@ -343,7 +342,7 @@ export function activateManaAbility(
   state: GameState,
   playerId: PlayerId,
   cardId: CardInstanceId,
-  abilityIndex: number
+  _abilityIndex: number
 ): GameState {
   const card = state.cards.get(cardId);
   if (!card) {
@@ -382,19 +381,11 @@ export function activateManaAbility(
  * Mana abilities produce mana and don't use the stack
  */
 export function isManaAbility(
-  cardId: CardInstanceId,
+  _cardId: CardInstanceId,
   abilityText: string
 ): boolean {
   // Check if the ability produces mana
   // Mana abilities are abilities that produce mana as part of their cost/effect
-  const manaKeywords = [
-    "add",
-    "produce",
-    "tap: add",
-    "{tap}: add",
-    "mana",
-  ];
-  
   const lowerText = abilityText.toLowerCase();
   
   // Check if it produces colored mana

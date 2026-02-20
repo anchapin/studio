@@ -18,8 +18,7 @@ import type {
 } from "./types";
 import { Phase } from "./types";
 import { moveCardBetweenZones } from "./zones";
-import { canPlayLand, spendMana, getSpellManaCost } from "./mana";
-import { isInstantOrSorcery, isCreature, isPlaneswalker, isArtifact, isEnchantment } from "./card-instance";
+import { spendMana, getSpellManaCost } from "./mana";
 
 /**
  * Generate a unique stack object ID
@@ -347,7 +346,7 @@ export function canTarget(
   targetType: Target["type"],
   targetId: string,
   state: GameState,
-  sourcePlayerId: PlayerId
+  _sourcePlayerId: PlayerId
 ): boolean {
   switch (targetType) {
     case "card": {
@@ -463,7 +462,7 @@ export function createXValueChoice(
 export function getValidTargets(
   stackObjectId: string,
   state: GameState,
-  playerId: PlayerId
+  _playerId: PlayerId
 ): ChoiceOption[] {
   const stackObject = state.stack.find(obj => obj.id === stackObjectId);
   if (!stackObject) {
@@ -521,11 +520,8 @@ export function validateSpellTargets(
  * Get the mana value of a spell from its card data
  * Uses the card-instance's getManaValue for accurate mana value calculation
  */
-export function getSpellManaValueFromCard(card: { mana_cost?: string }): number {
-  if (!card?.mana_cost) {
-    return 0;
-  }
-  // Use getManaValue from card-instance which handles all mana types correctly
-  // We construct a minimal CardInstance-like object to use the function
-  return 0; // Mana value is already available from card.cardData.cmc
+export function getSpellManaValueFromCard(_card: { mana_cost?: string }): number {
+  // Mana value is already available from card.cardData.cmc
+  // This function is kept for API compatibility
+  return 0;
 }

@@ -3,17 +3,17 @@
 import * as React from "react";
 import { useState, useTransition } from "react";
 import { GameBoard } from "@/components/game-board";
-import { GameChat, ChatMessage } from "@/components/game-chat";
-import { EmotePicker, EmoteFeed, EmoteMessage } from "@/components/emote-picker";
+import { GameChat } from "@/components/game-chat";
+import { EmotePicker, EmoteFeed } from "@/components/emote-picker";
 import { TurnTimer } from "@/components/turn-timer";
-import { DamageOverlay, useDamageEvents, DamageType } from "@/components/damage-indicator";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DamageOverlay, useDamageEvents } from "@/components/damage-indicator";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { PlayerState, PlayerCount, ZoneType } from "@/types/game";
-import { Swords, Settings, Eye, MessageCircle, Smile, Lightbulb, AlertTriangle, Zap } from "lucide-react";
+import { Swords, Eye, MessageCircle, Smile, Lightbulb, AlertTriangle, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useGameChat } from "@/hooks/use-game-chat";
 import { useGameEmotes } from "@/hooks/use-game-emotes";
@@ -164,7 +164,6 @@ export default function GameBoardPage() {
   const { 
     messages, 
     sendMessage, 
-    addSystemMessage, 
     clearMessages,
     unreadCount,
     markAsRead 
@@ -180,7 +179,7 @@ export default function GameBoardPage() {
   });
 
   // Initialize damage events
-  const { events: damageEvents, addDamage, addHeal, clearEvents: clearDamageEvents } = useDamageEvents();
+  const { events: damageEvents, addDamage, addHeal } = useDamageEvents();
 
   // Initialize players when player count changes
   React.useEffect(() => {
@@ -303,9 +302,6 @@ export default function GameBoardPage() {
 
   // Convert player state to game state format for AI analysis
   const convertToGameState = () => {
-    const currentPlayer = players.find(p => p.id === currentPlayerId);
-    const opponent = players.find(p => p.id !== currentPlayerId);
-    
     return {
       players: players.map(p => ({
         id: p.id,

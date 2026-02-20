@@ -126,7 +126,7 @@ export class WebSocketConnection {
           this.handleDisconnection(event);
         };
 
-        this.socket.onerror = (_error) => {
+        this.socket.onerror = () => {
           clearTimeout(this.connectionTimer!);
           this.events.onError(new Error('WebSocket error'));
           reject(new Error('WebSocket connection failed'));
@@ -174,7 +174,7 @@ export class WebSocketConnection {
             this.roomId = response.payload.roomId;
             resolve(response.payload);
           }
-        } catch (_error) {
+        } catch {
           // Ignore parse errors
         }
       };
@@ -225,7 +225,7 @@ export class WebSocketConnection {
             this.socket?.removeEventListener('message', handler);
             reject(new Error('Game not found'));
           }
-        } catch (_error) {
+        } catch {
           // Ignore parse errors
         }
       };
