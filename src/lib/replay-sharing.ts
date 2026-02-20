@@ -11,8 +11,87 @@
  */
 
 import type { Replay } from './game-state/replay';
+import type { ActionType, GameState, Zone } from './game-state/types';
+import { Phase } from './game-state/types';
 
 const REPLAY_PARAM = 'replay';
+
+/**
+ * Minified replay structure for URL encoding
+ */
+interface MinifiedReplay {
+  i: string;
+  m: {
+    f: string;
+    p: string[];
+    s: number;
+    c: boolean;
+    w?: string[];
+    sd?: number;
+    ed?: number;
+    er?: string;
+  };
+  a: MinifiedAction[];
+  cp: number;
+  ta: number;
+  ca: number;
+  lma: number;
+}
+
+interface MinifiedAction {
+  s: number;
+  t: ActionType;
+  pid: string;
+  d?: Record<string, unknown>;
+  rs: MinifiedGameState;
+  desc: string;
+  ra: number;
+}
+
+interface MinifiedGameState {
+  t: {
+    tn?: number;
+    cp?: string;
+    ap?: string;
+    pp?: string;
+  };
+  p: Array<{
+    id: string;
+    n: string;
+    l: number;
+    h: number;
+  }>;
+  z: {
+    bf: number;
+    g: number;
+    l: number;
+  };
+  s?: string;
+  w?: string[];
+  er?: string;
+}
+
+/**
+ * Helper type for extracting player info for minification
+ */
+interface PlayerForMinify {
+  id: string;
+  name: string;
+  life: number;
+  hand?: unknown[];
+}
+
+/**
+ * Helper type for extracting zone info for minification
+ */
+interface ZonesForMinify {
+  battlefield?: unknown[];
+  graveyard?: unknown[];
+  library?: unknown[];
+  hand?: unknown[];
+  stack?: unknown[];
+  exile?: unknown[];
+}
 const MAX_URL_LENGTH = 8000; // Safe limit for most browsers
 
 /**
@@ -171,7 +250,7 @@ export async function importReplayFromURL(replayId: string, serverURL: string): 
 /**
  * Minify replay data to reduce size for URL encoding
  */
-function minifyReplay(replay: Replay): object {
+function minifyReplay(replay: Replay): MinifiedReplay {
   return {
     i: replay.id,
     m: {
@@ -182,7 +261,7 @@ function minifyReplay(replay: Replay): object {
       w: replay.metadata.winners,
       sd: replay.metadata.gameStartDate,
       ed: replay.metadata.gameEndDate,
-      er: replay.metadata.endReason,
+      er: replay.metadata.endReason ?? undefined,
     },
     a: replay.actions.map(action => ({
       s: action.sequenceNumber,
@@ -203,36 +282,65 @@ function minifyReplay(replay: Replay): object {
 /**
  * Minimize game state to reduce size
  */
-function minifyGameState(state: any): object {
+function minifyGameState(state: GameState): MinifiedGameState {
+  // Extract player hand sizes from zones
+  const playerHandSizes = new Map<string, number>();
+  
+  // Count cards in each player's hand zone
+  state.zones.forEach((zone, key) => {
+    if (zone.type === 'hand' && zone.playerId) {
+      playerHandSizes.set(zone.playerId, zone.cardIds.length);
+    }
+  });
+
+  // Get battlefield, graveyard, and library counts
+  let battlefieldCount = 0;
+  let graveyardCount = 0;
+  let libraryCount = 0;
+  
+  state.zones.forEach((zone) => {
+    switch (zone.type) {
+      case 'battlefield':
+        battlefieldCount += zone.cardIds.length;
+        break;
+      case 'graveyard':
+        graveyardCount += zone.cardIds.length;
+        break;
+      case 'library':
+        libraryCount += zone.cardIds.length;
+        break;
+    }
+  });
+
   return {
     t: {
       tn: state.turn?.turnNumber,
       cp: state.turn?.currentPhase,
       ap: state.turn?.activePlayerId,
-      pp: state.turn?.priorityPlayerId,
+      pp: state.priorityPlayerId ?? undefined,
     },
-    p: Array.from(state.players?.values() || []).map((player: any) => ({
+    p: Array.from(state.players?.values() || []).map((player) => ({
       id: player.id,
       n: player.name,
       l: player.life,
-      h: player.hand?.length || 0,
+      h: playerHandSizes.get(player.id) || 0,
     })),
     z: {
-      bf: state.zones?.battlefield?.length || 0,
-      g: state.zones?.graveyard?.length || 0,
-      l: state.zones?.library?.length || 0,
+      bf: battlefieldCount,
+      g: graveyardCount,
+      l: libraryCount,
     },
     s: state.status,
     w: state.winners,
-    er: state.endReason,
+    er: state.endReason ?? undefined,
   };
 }
 
 /**
  * Expand minified replay back to full format
  */
-function expandReplay(minified: any): Replay {
-  const actions = minified.a.map((action: any) => ({
+function expandReplay(minified: MinifiedReplay): Replay {
+  const actions = minified.a.map((action: MinifiedAction) => ({
     sequenceNumber: action.s,
     action: {
       type: action.t,
@@ -253,9 +361,9 @@ function expandReplay(minified: any): Replay {
       startingLife: minified.m.s,
       isCommander: minified.m.c,
       winners: minified.m.w,
-      gameStartDate: minified.m.sd,
+      gameStartDate: minified.m.sd ?? 0,
       gameEndDate: minified.m.ed,
-      endReason: minified.m.er,
+      endReason: minified.m.er ?? undefined,
     },
     actions,
     currentPosition: minified.cp,
@@ -267,32 +375,122 @@ function expandReplay(minified: any): Replay {
 
 /**
  * Expand minimized game state back to full format
+ * Note: This creates a simplified GameState suitable for replay display
  */
-function expandGameState(minified: any): any {
+function expandGameState(minified: MinifiedGameState): GameState {
+  const now = Date.now();
+  
+  // Create players map
+  const players = new Map(minified.p?.map((p) => [p.id, {
+    id: p.id,
+    name: p.n,
+    life: p.l,
+    poisonCounters: 0,
+    commanderDamage: new Map(),
+    maxHandSize: 7,
+    currentHandSizeModifier: 0,
+    hasLost: false,
+    lossReason: null,
+    landsPlayedThisTurn: 0,
+    maxLandsPerTurn: 1,
+    manaPool: {
+      colorless: 0,
+      white: 0,
+      blue: 0,
+      black: 0,
+      red: 0,
+      green: 0,
+      generic: 0,
+    },
+    isInCommandZone: false,
+    experienceCounters: 0,
+    commanderCastCount: 0,
+    hasPassedPriority: false,
+    hasActivatedManaAbility: false,
+    additionalCombatPhase: false,
+    additionalMainPhase: false,
+    hasOfferedDraw: false,
+    hasAcceptedDraw: false,
+  }]));
+
+  // Create zones map
+  const zones = new Map<string, Zone>();
+  let zoneId = 0;
+  
+  minified.p?.forEach((p) => {
+    // Hand zone for each player
+    zones.set(`hand-${p.id}`, {
+      type: 'hand' as const,
+      playerId: p.id,
+      cardIds: Array(p.h).fill('').map(() => `placeholder-${++zoneId}`),
+      isRevealed: false,
+      visibleTo: [p.id],
+    });
+  });
+
+  // Battlefield zone (shared)
+  zones.set('battlefield', {
+    type: 'battlefield' as const,
+    playerId: null,
+    cardIds: Array(minified.z?.bf || 0).fill('').map(() => `placeholder-${++zoneId}`),
+    isRevealed: true,
+    visibleTo: [],
+  });
+
+  // Graveyard zones
+  minified.p?.forEach((p) => {
+    zones.set(`graveyard-${p.id}`, {
+      type: 'graveyard' as const,
+      playerId: p.id,
+      cardIds: [],
+      isRevealed: true,
+      visibleTo: [],
+    });
+  });
+
+  // Library zones
+  minified.p?.forEach((p) => {
+    zones.set(`library-${p.id}`, {
+      type: 'library' as const,
+      playerId: p.id,
+      cardIds: Array(minified.z?.l || 0).fill('').map(() => `placeholder-${++zoneId}`),
+      isRevealed: false,
+      visibleTo: [p.id],
+    });
+  });
+
+  // Get first player as active player
+  const firstPlayerId = minified.p?.[0]?.id || '';
+
   return {
+    gameId: `replay-game-${now}`,
+    players,
+    cards: new Map(),
+    zones,
+    stack: [],
     turn: {
+      activePlayerId: firstPlayerId,
+      currentPhase: (minified.t?.cp || Phase.UNTAP) as Phase,
       turnNumber: minified.t?.tn || 1,
-      currentPhase: minified.t?.cp || 'begin',
-      activePlayerId: minified.t?.ap,
-      priorityPlayerId: minified.t?.pp,
+      extraTurns: 0,
+      isFirstTurn: false,
+      startedAt: now,
     },
-    players: new Map(minified.p?.map((p: any) => [p.id, {
-      id: p.id,
-      name: p.n,
-      life: p.l,
-      hand: Array(p.h).fill({}),
-    }])),
-    zones: {
-      battlefield: Array(minified.z?.bf || 0).fill({}),
-      graveyard: Array(minified.z?.g || 0).fill({}),
-      library: Array(minified.z?.l || 0).fill({}),
-      hand: [],
-      stack: [],
-      exile: [],
+    combat: {
+      inCombatPhase: false,
+      attackers: [],
+      blockers: new Map(),
+      remainingCombatPhases: 0,
     },
-    status: minified.s || 'in_progress',
-    winners: minified.w,
-    endReason: minified.er,
+    waitingChoice: null,
+    priorityPlayerId: minified.t?.pp || firstPlayerId,
+    consecutivePasses: 0,
+    status: (minified.s || 'in_progress') as 'not_started' | 'in_progress' | 'paused' | 'completed',
+    winners: minified.w || [],
+    endReason: minified.er || null,
+    format: 'unknown',
+    createdAt: now,
+    lastModifiedAt: now,
   };
 }
 
